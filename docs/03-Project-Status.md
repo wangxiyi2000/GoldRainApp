@@ -1,0 +1,172 @@
+# 《搬砖爆金币》项目现状与开发交接
+
+> 版本：v1.3 ｜ 日期：2026-10-11 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
+>
+> **v1.1 变更**：M1.5「免打卡模型」已完成——删除手动打卡，改为按上班时间自动推算；过点自动收工入库；工作日自动补齐历史。详见 §5.1。
+> **v1.2 变更**：修正「周末不算钱」只做了一半的 bug——周末现在连**当天**也不算钱（新增 `ShiftPhase.rest`）。详见 §5.2。
+> **v1.3 变更**：**M2 金币爆屏粒子动画已完成**——`CoinField` 粒子系统 + 4 帧金币精灵 + 底部金堆 + 出生闪光/飘字 + 60 秒金币瀑布 + 触觉反馈，真机像素差分验证满屏爆币。详见 §5.1 / §6。
+
+---
+
+## 1. 一句话现状
+
+**M2 已完成：数据闭环 → 金币哗哗爆满屏。** 到点自动开爆 → 金币按"账本 × 视觉倍率"满屏爆落（4 帧旋转精灵、重力/弹跳/底部金堆、出生闪光 + "+1" 飘字、每 60 秒一次金币瀑布 ×20）→ 金额实时跳动（3 位小数）→ 过点自动收工 → 战报自动入库 → 工作日自动补齐历史 → 周末不算钱。全链路真机验证：金币动画像素差分确认满屏运动、金堆可见、正式版 v0.3.0（arm64 17.0MB）已装回手机。下一步是 P1 增强（摸鱼提示 / 整点金币雨 / 皮肤 / 音效）与真机长测。**
+
+进度标记：`M0 ✅` ｜ `M1 ✅` ｜ `M1.5 免打卡 + 周末不算钱 [██████████] 完成` ｜ `M2 金币爆屏 [██████████] 完成`
+
+---
+
+## 2. 文件清单（读完这一节就知道每个文件干嘛的）
+
+```
+12_GoldRainApp/
+├── docs/
+│   ├── 01-PRD.md               # 产品定义：定位/玩法/公式/视觉基调/里程碑/风险
+│   ├── 02-Dev-Manual.md        # 开发手册：M0~M4 全流程 + 核心代码骨架 + 踩坑表 + P1 指引
+│   ├── 03-Project-Status.md    # 本文件：现状快照 + 交接
+│   └── 04-M0-Env-Setup.md      # M0 环境搭建完成记录（安装清单/环境变量/踩坑）
+└── gold_rain/                  # Flutter 工程（项目名 gold_rain，applicationId com.example.gold_rain）
+    ├── lib/
+    │   ├── main.dart           # 入口 + AppRoot 全局状态机（免打卡三态 + 自动收工/补齐）
+    │   ├── theme.dart          # 主色常量 + formatCoins/formatDuration + GoldButton/SectionLabel
+    │   ├── engine/
+    │   │   ├── coin_engine.dart      # 数值引擎（纯逻辑，可单测）
+    │   │   └── report_generator.dart # 战报文案引擎（日期种子）
+    │   ├── models/
+    │   │   ├── app_settings.dart     # 月薪/上下班时间/工作日/倍率 + isWorkday + toShift
+    │   │   ├── shift.dart            # 【v1.3 核心】固定班次：四态判断（休息/上班前/搬砖中/已收工）+ 时长推算
+    │   │   └── daily_report.dart     # 一天的战报（金库账目）
+    │   ├── store/
+    │   │   └── local_store.dart      # app_settings / first_use_day / daily_reports
+    │   ├── render/
+    │   │   └── coin_field.dart      # 【M2 核心】金币粒子场：重力/弹跳/金堆/闪光/飘字/60 秒瀑布/触觉
+    │   └── pages/
+    │       ├── home_page.dart        # 首页（上班前/已收工两态 + 最近收益 + 金库/设置）
+    │       ├── rain_page.dart        # 搬砖中：金额 3 位小数连续跳动 + CoinField 金币爆屏
+    │       ├── report_page.dart      # 今日战报（自动入库，只展示）
+    │       ├── vault_page.dart       # 金库：累计 + 历史战报
+    │       └── settings_page.dart    # 月薪/时间/工作日/倍率
+    ├── assets/icon/            # App 图标（app_icon.png 主图 + make_icons.py 生成脚本）
+    ├── assets/images/          # 金币精灵 coin_0~3.png（4 帧旋转）+ make_coins.py 生成脚本
+    ├── test/                   # coin_engine(8) + report_generator(3) + shift(15) + coin_field(2) = 28 个用例
+    ├── pubspec.yaml            # 依赖：flutter + shared_preferences + flutter_test + flutter_lints；assets: assets/images/
+    ├── analysis_options.yaml   # 规范：flutter_lints + prefer_single_quotes
+    └── android/                # 已生成，release 用 Flutter 测试签名（signingConfigs.debug）
+```
+
+**注意**：`lib/render/coin_field.dart`（M2 粒子系统）与 `assets/images/coin_0~3.png`（金币精灵）**已建**。M2 验收截图：`docs/preview-m2-rest.png`（周日休息页）/ `preview-m2-rain2.png`（搬砖爆金币）/ `preview-m2-surge.png`（60 秒金币瀑布）。
+
+---
+
+## 3. 已锁定的技术决策（不要随意推翻）
+
+| 项 | 决策 | 出处 |
+|---|---|---|
+| 框架 | **Flutter**（Dart），Windows 开发 → Android 侧载，iOS 暂缓 | PRD §7 / 手册 §1.1 |
+| 平台 | Android 优先，APK 自装不上架；iOS 需 ¥688/年 账号，暂不做 | PRD §7 |
+| 架构核心 | **逻辑与渲染分离**：`CoinEngine` 只出数字，`CoinField` 只负责画 | 手册 §1.3 |
+| 渲染方案 | `CustomPainter` + `AnimationController` 每帧自绘，**不用** Tween 做粒子、不引 flame | 手册 §5.1 |
+| 粒子硬上限 | `maxCoins = 300`（防越爆越卡），省电模式 150 + 30fps | 手册 §5.3/§5.4 |
+| 存储 | MVP 用 `shared_preferences`，历史记录再升 SQLite | PRD §7 / 手册 §4.3 |
+| 计时 | **免打卡**：上班/下班时间来自设置，金币按「今天的上班时间 → 现在」推算；不做后台保活 | PRD §4.2 |
+| 分发 | release 用 Flutter 测试签名（`signingConfigs.debug`），侧载自用；分包 `--split-per-abi`，arm64 仅 16.9MB | 手册 §7 |
+| 视觉 | 主色 `#FFD700` 土豪金 + 深色背景 `#121212`；金币必须是精灵图（4 帧旋转），不是色块 | PRD §5 |
+| 隐私 | 零权限起步，全本地，卸载即清零 | PRD §6 |
+
+---
+
+## 4. 核心公式（全项目的数值基准，改这里要想清楚）
+
+```
+每日工时    = 下班时间 - 上班时间                    用户自己设置，例：18:00 - 09:00 = 9 小时
+时薪        = 月薪 ÷ (每月工作日 × 每日工时)        例：10000 ÷ 22 ÷ 9 ≈ 50.5 元/时
+账本每秒金币 = 时薪 × 1（1元=1枚）÷ 3600            例：≈ 0.014 枚/秒（约 71 秒 1 枚）
+屏幕每秒金币 = 账本每秒金币 × 视觉倍率 N            例：N=100 → 屏幕每秒爆 1~2 枚
+某段时长金币 = floor(秒数 × 账本每秒金币)           （向下取整，仅展示）
+金币 → 购买力 = 金币 = 元（1枚=1元），再分档（辣条/早餐/奶茶/日料/海底捞）
+```
+
+**账实分离（PRD v1.2 核心）**：账本严格 1元=1枚（战报/金库数字=真金白银）；`visualMultiplier` 视觉倍率只影响屏幕出币密度，**不改账本**。
+
+`CoinEngine` 构造参数：`monthlySalary`（必填）、`workDaysPerMonth`（默认 22）、`hoursPerDay`（默认 8）、`visualMultiplier`（默认 100）。
+静态方法 `CoinEngine.hoursFromClock(startMinutes, endMinutes)` 由上下班时间算每日工时（跨天自动 +24h）。
+
+---
+
+## 5. 代码现状盘点
+
+### 5.1 已实现 ✅
+
+| 文件 | 内容 |
+|---|---|
+| `lib/engine/coin_engine.dart` | `hourlyRate` / `coinsPerSecond`（账本 1元=1枚）/ `spawnPerSecond`（屏幕出币 = 账本 × 视觉倍率）/ `coinsEarned(Duration)`（精确小数金额）/ `coinsFor(Duration)` / `purchasingPower(double)` / 静态 `hoursFromClock()` 全部实现 |
+| `lib/models/app_settings.dart` | 用户设置：月薪 / 上班时间 / 下班时间 / 每月工作日 / 视觉倍率；`hoursPerDay`（跨天自动处理）、`toEngine()`、`toShift()`、静态 `isWorkday()`、`copyWith`、JSON |
+| `lib/models/shift.dart` | **【v1.3 核心】**固定班次：`ShiftPhase{rest,before,working,after}` 四态判断、`statusAt(now)` 返回 `ShiftStatus(phase, day, worked)`、静态 `Shift.isWorkday()`、`workdaysOnly` 开关、支持跨天夜班（含"周五夜班跨周六仍算在班"）、`total` 单班时长 |
+| `lib/models/daily_report.dart` | 一天的战报（金库账目）：日期 / 金额 / 时长 / 是否自动补齐（`autoSettled`） |
+| `lib/engine/report_generator.dart` | 战报文案引擎：开篇 + 收尾各 4 句，用日期做种子保证同一天同一句 |
+| `lib/store/local_store.dart` | 持久化三件事：`app_settings` / `first_use_day`（补造起点）/ `daily_reports`；**金库总额 = 战报金额之和**；`addReport` 同日只记一次；`addReports` 批量入库；`removeReport` 供改设置后重算今天 |
+| `lib/theme.dart` | 主色常量 + `formatCoins()`（千分位 + 3 位小数）+ `formatDuration()` + `GoldButton` + `SectionLabel` |
+| `lib/main.dart` | `AppRoot` 全局状态机（`WidgetsBindingObserver`）：启动读设置/首次使用日/历史 → **补造历史工作日 + 今天过点自动收工入库** → 按三态渲染搬砖页 / 战报 / 首页；**搬砖中 1 秒心跳、其余 15 秒低频检查状态切换**；回前台立即重算；改设置后重算今天 |
+| `lib/pages/` | `home_page`（**休息日/上班前/已收工三态** + **最近 7 天收益列表** + 空态提示 + 金库/设置入口）、`rain_page`（**金额 3 位小数连续跳动 + CoinField 金币爆屏叠层** + 距下班倒计时）、`report_page`（数字滚动，标注"已自动收进金库"）、`vault_page`（累计 + 历史战报）、`settings_page`（月薪/时间/工作日/倍率，实时预览时薪） |
+| `lib/render/coin_field.dart` | **【M2 核心】**金币粒子场：真实 dt 物理（重力/弹跳衰减/落地随机高度成"金山"）、4 帧精灵旋转、出生白色径向闪光、"+1" 飘字、每 60 秒 ×20 金币瀑布 3 秒、触觉限频 5 次/秒、`maxCoins=300` 硬上限；素材缺失自动退回占位圆 |
+| `assets/images/` | 金币精灵 `coin_0~3.png`（256px 透明底：正面/侧倾/侧视/侧倾，¥ 符号 + 高光/暗部），由 `make_coins.py` 一键生成 |
+| `test/` | **28 个用例全过**：`coin_engine_test`(8) + `report_generator_test`(3) + `shift_test`(15) + `coin_field_test`(2，渲染冒烟) |
+
+### 5.2 未实现 / 缺口 ⚠️（后续开发要补的）
+
+| 缺口 | 对应里程碑 | 说明 |
+|---|---|---|
+| ~~Flutter 工程平台文件夹~~ | M0 | ✅ 已完成：`android/` 已生成 |
+| ~~状态持久化（会话）~~ | M1 | ✅ 已完成：会话按上班时间推算，杀进程重开不丢 |
+| ~~设置页 + 设置持久化~~ | M1 | ✅ 已完成：`app_settings.dart` + `settings_page.dart`，改完重开 App 仍生效 |
+| ~~手动打卡 / 防重复打卡 / 忘打卡补结算~~ | M1.5 | ✅ **已整体删除**：免打卡模型下这些规则不再需要（PRD v1.3） |
+| ~~过点自动收工入库~~ | M1.5 | ✅ 已完成：状态切到"已收工"时自动写战报，无需任何按钮 |
+| ~~工作日自动补齐历史~~ | M1.5 | ✅ 已完成：首次使用日 → 昨天，每个工作日（周一~周五）补一条全勤，`autoSettled=true` |
+| ~~周末不算钱（当天）~~ | M1.5 | ✅ **已修复**：原先只在"补齐历史"判断工作日，"当天"漏了 → 周六打开会显示"搬砖中"且过点自动白记一天工资。现 `Shift.statusAt()` 在源头返回 `ShiftPhase.rest`，`_bankDay()` 再加一道 `isWorkday` 双保险。真机验证：周日打开本地存储无战报 |
+| ~~战报文案引擎~~ | M1 | ✅ 已完成：`report_generator.dart`（同一天同一句） |
+| ~~金库累计页~~ | M1 | ✅ 已完成：`vault_page.dart`，总额 = 历史战报金额之和 |
+| **金币爆屏粒子系统** | M2 | ✅ **已完成**：`lib/render/coin_field.dart` 已建，真机像素差分确认满屏爆币（3 秒 49 万像素变化） |
+| **金币精灵素材** | M2 | ✅ **已完成**：`assets/images/coin_0~3.png` + `pubspec.yaml` 已声明 `assets:`；脚本 `make_coins.py` 可重新生成 |
+| **摸鱼提示** | P1 | `WidgetsBindingObserver` 监听前后台；回前台弹「你摸鱼了 X 分钟」（金币照给不扣），尚未接 |
+| **整点金币雨 / 皮肤 / 桌面小组件** | P1~P2 | 见手册 §10 |
+| ~~App 名称/图标~~ | M4 | ✅ 已完成：`android:label="搬砖爆金币"`；图标「金币+红砖」已覆盖 5 档 mipmap（脚本 `assets/icon/make_icons.py`） |
+| **打包分发** | M4 | ✅ 已完成：release 出包 + `--split-per-abi`（arm64 16.9MB），成品放 `1_apk_files/`；用 Flutter 测试签名，未做正式签名 |
+
+---
+
+## 6. 下一步（M2 已完成 → P1 增强）
+
+M2 金币爆屏已落地并通过真机验证（截图：`preview-m2-rain2.png` 爆币中 / `preview-m2-surge.png` 60 秒瀑布）。接下来的候选项按性价比排序：
+
+1. **P1 摸鱼提示**：回前台若离开 ≥2 分钟弹「你摸鱼了 X 分钟」（金币照给不扣）——`main.dart` 的 `WidgetsBindingObserver` 已具备监听基础，只差弹窗
+2. **P1 整点金币雨**：整点触发一次比 60 秒瀑布更大的金币雨（可与 M2 瀑布逻辑复用）
+3. **P1 音效**：金币落地/爆屏音效（小体积 wav 入 assets），注意别太吵
+4. **P1 皮肤系统**：金币换成其他主题（红砖/珍珠等），本质是换一组精灵图
+5. **P2 桌面小组件 / 金库更多玩法**：见手册 §10
+6. **真机长测**：工作日白天连续开 10 分钟以上，确认帧率 ≥50fps、不发烫、切后台回来金币数不乱
+
+> 开发环境与真机调试踩坑见 `04-M0-Env-Setup.md`；M1 真机效果截图见 `preview-m1.png`。
+
+---
+
+## 7. 风险 / 待确认
+
+| 项 | 状态 |
+|---|---|
+| 中文路径 | ✅ 已解决：根目录已改为 `12_GoldRainApp`，全部英文路径 |
+| 本机开发环境 | ✅ 已搭好并验证：Flutter 3.47.7 + JDK 21 + Android SDK 36 + NDK 28.2.13676358（详见 `04-M0-Env-Setup.md`） |
+| C 盘空间 | ⚠️ 搭建后剩 24.7 GB（Gradle/pub 缓存占的），后续若紧张可把 `GRADLE_USER_HOME` 迁到 D 盘 |
+| 月薪默认值 | demo 里硬编码 10000，M1 需做成可设置项 |
+| 金币素材版权 | 计划用 opengameart / kenney.nl 免费素材，或 AI 生成透明底金币序列 |
+| 包体 | 目标 < 30MB，`--split-per-abi` 可按架构分包 |
+
+---
+
+## 8. 开发约定（沿用现有代码风格）
+
+- Dart 用**单引号**（`analysis_options.yaml` 已强制 `prefer_single_quotes`）
+- 颜色常量集中在 `main.dart` 顶部（`kGold` / `kGoldDark` / `kBg`），后续建议抽到统一主题文件
+- 纯逻辑（引擎、文案、存储）与 UI 分离，逻辑必须可单测
+- 每完成一个里程碑：`git add . && git commit`（手册附页建议每周至少一次提交）
+- 文案走"打工人黑话"口吻（血汗钱可视化、搬砖收益实时到账）

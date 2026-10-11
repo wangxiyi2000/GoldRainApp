@@ -1,0 +1,15 @@
+# Flutter/Dart 产物
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# 本地环境
+*.local
+.kotlin/

@@ -1,0 +1,22 @@
+name: gold_rain
+description: "搬砖爆金币——上班打卡，金币实时爆屏的情绪价值 App（M0 demo）"
+publish_to: "none"
+version: 0.3.0+4
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.5.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
