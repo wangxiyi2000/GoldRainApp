@@ -1,9 +1,6 @@
 # 工具本地状态（TRAE 工作区记忆，不进版本库）
 .workbuddy/
 
-# 分发产物：APK 可从源码重新构建，不入库
-1_apk_files/*.apk
-
 # IDE / 系统杂项
 .idea/
 *.iml
