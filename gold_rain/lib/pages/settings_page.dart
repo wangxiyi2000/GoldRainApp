@@ -1,15 +1,17 @@
-// 设置页：月薪 / 上班时间 / 下班时间 / 每月工作日 / 视觉倍率。
+// 设置页：月薪 / 上班时间 / 下班时间 / 每月工作日 / 视觉倍率 / 音效 / 皮肤。
 // 保存后返回新的 AppSettings，由上层写进本地存储。
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/app_settings.dart';
+import '../render/skins.dart';
 import '../theme.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required this.initial});
+  const SettingsPage({super.key, required this.initial, required this.vaultCoins});
 
   final AppSettings initial;
+  final double vaultCoins; // 金库总额（皮肤解锁门槛用）
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -21,6 +23,8 @@ class _SettingsPageState extends State<SettingsPage> {
   late int _end;
   late int _days;
   late int _multiplier;
+  late bool _soundOn;
+  late String _skinId;
 
   static const _multipliers = [1, 10, 50, 100, 200];
 
@@ -33,6 +37,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _end = s.workEndMinutes;
     _days = s.workDaysPerMonth;
     _multiplier = s.visualMultiplier;
+    _soundOn = s.soundEnabled;
+    _skinId = s.skinId;
   }
 
   @override
@@ -48,6 +54,8 @@ class _SettingsPageState extends State<SettingsPage> {
         workEndMinutes: _end,
         workDaysPerMonth: _days,
         visualMultiplier: _multiplier,
+        soundEnabled: _soundOn,
+        skinId: _skinId,
       );
 
   Future<void> _pickTime({required bool isStart}) async {
@@ -199,6 +207,29 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 28),
+          _label('音效（金币落地叮 + 爆发唰，可关）'),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('金币音效', style: TextStyle(color: Colors.white)),
+            subtitle: Text('关掉就是纯视觉爽感',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+            value: _soundOn,
+            activeTrackColor: kGoldDark,
+            activeThumbColor: kGold,
+            onChanged: (v) => setState(() => _soundOn = v),
+          ),
+          const SizedBox(height: 20),
+          _label('皮肤（金库余额达到门槛自动解锁）'),
+          ...kSkins.map((skin) => _SkinTile(
+                skin: skin,
+                vaultCoins: widget.vaultCoins,
+                selected: _skinId == skin.id,
+                onTap: () {
+                  if (!skin.isUnlocked(widget.vaultCoins)) return;
+                  setState(() => _skinId = skin.id);
+                },
+              )),
+          const SizedBox(height: 28),
           GoldButton(label: '保存', onTap: _save),
         ],
       ),
@@ -242,6 +273,60 @@ class _TimeBox extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 皮肤选择行：色块 + 名称 + 解锁门槛 / 已解锁 / 已选中
+class _SkinTile extends StatelessWidget {
+  const _SkinTile({
+    required this.skin,
+    required this.vaultCoins,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final CoinSkin skin;
+  final double vaultCoins;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final unlocked = skin.isUnlocked(vaultCoins);
+    final subtitle = unlocked
+        ? '已解锁'
+        : '攒到 ${skin.unlockCoins} 枚解锁（还差 ${(skin.unlockCoins - vaultCoins).toStringAsFixed(0)}）';
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: skin.themeColor.withValues(alpha: 0.15),
+          shape: BoxShape.circle,
+          border: Border.all(
+              color: unlocked ? skin.themeColor : Colors.white24, width: 2),
+        ),
+        child: Icon(
+          unlocked ? Icons.paid : Icons.lock,
+          size: 20,
+          color: unlocked ? skin.themeColor : Colors.grey.shade600,
+        ),
+      ),
+      title: Text(skin.name,
+          style: TextStyle(
+            color: unlocked ? Colors.white : Colors.grey.shade600,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+          )),
+      subtitle: Text(subtitle,
+          style: TextStyle(
+              color: unlocked ? Colors.grey.shade400 : Colors.grey.shade700,
+              fontSize: 12)),
+      trailing: selected
+          ? const Icon(Icons.check_circle, color: kGold, size: 22)
+          : null,
+      onTap: onTap,
     );
   }
 }

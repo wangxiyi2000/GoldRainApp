@@ -1,5 +1,7 @@
-// 用户设置（PRD v1.2）：月薪、上班时间、下班时间由用户自己填，全部本地持久化。
+// 用户设置（PRD v1.2 + P1）：月薪、上班时间、下班时间由用户自己填，全部本地持久化。
+// P1 新增：音效开关 soundEnabled、皮肤 skinId（皮肤解锁看金库总额，不存这里）。
 import '../engine/coin_engine.dart';
+import '../render/skins.dart';
 import 'shift.dart';
 
 class AppSettings {
@@ -9,6 +11,8 @@ class AppSettings {
     this.workEndMinutes = 18 * 60, // 18:00
     this.workDaysPerMonth = 22,
     this.visualMultiplier = 100, // 屏幕视觉倍率（只影响画面）
+    this.soundEnabled = true, // P1：金币音效开关
+    this.skinId = 'gold', // P1：当前皮肤（默认金币）
   });
 
   final double monthlySalary;
@@ -16,6 +20,11 @@ class AppSettings {
   final int workEndMinutes;
   final int workDaysPerMonth;
   final int visualMultiplier;
+  final bool soundEnabled;
+  final String skinId;
+
+  /// 当前皮肤（未知 id 自动回退默认金币）
+  CoinSkin get skin => skinById(skinId);
 
   /// 每日工时（小时）= 下班 - 上班，跨天自动处理
   double get hoursPerDay => CoinEngine.hoursFromClock(
@@ -54,6 +63,8 @@ class AppSettings {
     int? workEndMinutes,
     int? workDaysPerMonth,
     int? visualMultiplier,
+    bool? soundEnabled,
+    String? skinId,
   }) =>
       AppSettings(
         monthlySalary: monthlySalary ?? this.monthlySalary,
@@ -61,6 +72,8 @@ class AppSettings {
         workEndMinutes: workEndMinutes ?? this.workEndMinutes,
         workDaysPerMonth: workDaysPerMonth ?? this.workDaysPerMonth,
         visualMultiplier: visualMultiplier ?? this.visualMultiplier,
+        soundEnabled: soundEnabled ?? this.soundEnabled,
+        skinId: skinId ?? this.skinId,
       );
 
   Map<String, Object> toJson() => {
@@ -69,6 +82,8 @@ class AppSettings {
         'workEndMinutes': workEndMinutes,
         'workDaysPerMonth': workDaysPerMonth,
         'visualMultiplier': visualMultiplier,
+        'soundEnabled': soundEnabled,
+        'skinId': skinId,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -77,5 +92,8 @@ class AppSettings {
         workEndMinutes: j['workEndMinutes'] as int,
         workDaysPerMonth: j['workDaysPerMonth'] as int,
         visualMultiplier: j['visualMultiplier'] as int,
+        // P1 新增字段：旧存档没有时用默认值，向后兼容
+        soundEnabled: j['soundEnabled'] as bool? ?? true,
+        skinId: j['skinId'] as String? ?? 'gold',
       );
 }

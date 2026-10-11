@@ -1,13 +1,14 @@
-// 金币粒子场（M2 核心爽感）——CustomPainter 每帧自绘，逻辑与渲染分离。
+// 金币粒子场（M2 核心爽感 + P1）——CustomPainter 每帧自绘，逻辑与渲染分离。
 // 只负责"把金币画得华丽"，每秒爆多少枚由 CoinEngine（spawnPerSecond）提供。
 //
 // 实现（手册 §5.3 骨架 + 增强）：
 //   · 重力下落 + 落地弹跳两次后堆积成"金堆"
 //   · 金币精灵 4 帧旋转（帧 0→1→2→3 循环 = 旋转一圈）
 //   · 出生瞬间白色径向闪光 + "+1" 飘字上浮淡出
-//   · 每 60 秒一次"金币瀑布"（出币速率临时 ×20，持续 3 秒）
-//   · 触觉反馈限频 5 次/秒
-//   · 粒子硬上限 maxCoins = 300（防越爆越卡）
+//   · 每 60 秒一次"金币瀑布"（速率 ×20，3 秒）；P1 整点再爆一次更猛的（×40，4 秒）
+//   · P1 音效：金币落地"叮"（限频）+ 瀑布"唰"，有静音开关
+//   · P1 皮肤：精灵图与主题色由 CoinSkin 提供（金库余额解锁）
+//   · 触觉反馈限频 5 次/秒；粒子硬上限 maxCoins = 300（防越爆越卡）
 import 'dart:math';
 import 'dart:ui' as ui;
 
@@ -15,7 +16,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
-import '../theme.dart';
+import 'skins.dart';
+import 'sound_player.dart';
 
 /// 一枚在屏幕上的金币粒子
 class _Coin {
@@ -44,10 +46,25 @@ class _FloatText {
 }
 
 class CoinField extends StatefulWidget {
-  const CoinField({super.key, required this.spawnPerSecond});
+  const CoinField({
+    super.key,
+    required this.spawnPerSecond,
+    this.skin = kGoldSkin,
+    this.soundOn = true,
+    this.onHourlySurge,
+  });
 
   /// 屏幕出币速率（枚/秒）= 账本速率 × 视觉倍率，由 CoinEngine 提供
   final double spawnPerSecond;
+
+  /// 当前皮肤（精灵图 + 主题色），切肤自动重载
+  final CoinSkin skin;
+
+  /// 音效开关（来自设置）
+  final bool soundOn;
+
+  /// 整点大爆发回调（参数=当前小时），给页面弹"恭喜存活到 X 点"
+  final ValueChanged<int>? onHourlySurge;
 
   @override
   State<CoinField> createState() => _CoinFieldState();
@@ -61,8 +78,11 @@ class _CoinFieldState extends State<CoinField>
   static const _surgeEvery = 60.0; // 每 60 秒一次金币瀑布
   static const _surgeDuration = 3.0; // 瀑布持续 3 秒
   static const _surgeFactor = 20.0; // 瀑布期间速率 ×20
+  static const _hourlyFactor = 40.0; // P1 整点大爆发：速率 ×40
+  static const _hourlyDuration = 4.0; // 持续 4 秒
 
   late final Ticker _ticker;
+  late final SoundPlayer _sound;
   Duration? _lastTick;
   final List<_Coin> _coins = [];
   final List<_FloatText> _floats = [];
@@ -74,24 +94,27 @@ class _CoinFieldState extends State<CoinField>
   double _spawnAcc = 0;
   double _surgeRemaining = 0;
   double _surgeClock = 0;
+  double _surgeFactorNow = _surgeFactor; // 当前瀑布倍率（可被整点覆盖）
   double _hapticClock = 0;
+  int _lastHourSurge = -1; // 已触发整点的"小时"，防同小时重复爆
 
-  static const _spriteAssets = [
-    'assets/images/coin_0.png',
-    'assets/images/coin_1.png',
-    'assets/images/coin_2.png',
-    'assets/images/coin_3.png',
-  ];
-
-  /// 实际出币速率（金币瀑布期间临时 ×20）
+  /// 实际出币速率（瀑布/整点期间临时放大）
   double get _effectiveSpawn =>
-      widget.spawnPerSecond * (_surgeRemaining > 0 ? _surgeFactor : 1);
+      widget.spawnPerSecond * (_surgeRemaining > 0 ? _surgeFactorNow : 1);
 
   @override
   void initState() {
     super.initState();
     _ticker = createTicker(_update)..start();
+    _sound = SoundPlayer(enabled: widget.soundOn);
     _loadSprites();
+  }
+
+  @override
+  void didUpdateWidget(covariant CoinField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sound.enabled = widget.soundOn;
+    if (oldWidget.skin.id != widget.skin.id) _loadSprites(); // 换肤重载精灵
   }
 
   @override
@@ -101,7 +124,8 @@ class _CoinFieldState extends State<CoinField>
   }
 
   Future<void> _loadSprites() async {
-    for (final path in _spriteAssets) {
+    _frames.clear();
+    for (final path in widget.skin.framePaths) {
       try {
         final data = await rootBundle.load(path);
         final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
@@ -124,26 +148,35 @@ class _CoinFieldState extends State<CoinField>
     // ① 金币瀑布计时（每 60 秒爆发一次）
     if (_surgeRemaining > 0) {
       _surgeRemaining -= dt;
+      if (_surgeRemaining <= 0) _surgeFactorNow = _surgeFactor;
     } else {
       _surgeClock += dt;
       if (_surgeClock >= _surgeEvery) {
         _surgeClock = 0;
-        _surgeRemaining = _surgeDuration;
+        _startSurge();
       }
     }
 
-    // ② 按速率出生
+    // ② P1 整点大爆发：跨过整点那一刻爆一次更猛的（同小时只爆一次）
+    final now = DateTime.now();
+    if (now.minute == 0 && _lastHourSurge != now.hour) {
+      _lastHourSurge = now.hour;
+      _startSurge(factor: _hourlyFactor, duration: _hourlyDuration);
+      widget.onHourlySurge?.call(now.hour);
+    }
+
+    // ③ 按速率出生
     final rate = _effectiveSpawn;
     if (rate > 0) {
       _spawnAcc += rate * dt;
       while (_spawnAcc >= 1 && _coins.length < maxCoins) {
         _spawnAcc -= 1;
-        // 瀑布期间不飘字（太多会糊），平时每枚都飘 "+1"
+        // 瀑布/整点期间不飘字（太多会糊），平时每枚都飘 "+1"
         _spawn(x: _rng.nextDouble() * _width, showText: _surgeRemaining <= 0);
       }
     }
 
-    // ③ 物理推进：重力 + 落地弹跳/堆积
+    // ④ 物理推进：重力 + 落地弹跳/堆积
     final floor = _height - 150; // 底部金堆区（在下方按钮区之上，金堆可见）
     for (final c in _coins) {
       if (c.landed) continue;
@@ -164,23 +197,31 @@ class _CoinFieldState extends State<CoinField>
           c.vy = 0;
           c.landed = true;
           c.y = floor - _rng.nextDouble() * 36; // 随机高度，堆出"金山"层次感
+          _sound.ding(); // P1 落地"叮"（播放器内部限频）
         }
       }
     }
 
-    // ④ 飘字上浮淡出
+    // ⑤ 飘字上浮淡出
     for (final f in _floats) {
       f.y -= 46 * dt;
       f.life -= dt * 1.1;
     }
     _floats.removeWhere((f) => f.life <= 0);
 
-    // ⑤ 超限移除最老的金币（金山不无限涨）
+    // ⑥ 超限移除最老的金币（金山不无限涨）
     while (_coins.length > maxCoins) {
       _coins.removeAt(0);
     }
 
     setState(() {});
+  }
+
+  /// 触发一次瀑布/整点大爆发（可指定倍率与时长）
+  void _startSurge({double factor = _surgeFactor, double duration = _surgeDuration}) {
+    _surgeRemaining = duration;
+    _surgeFactorNow = factor;
+    _sound.whoosh(); // P1 爆发"唰"
   }
 
   void _spawn({required double x, bool showText = false}) {
@@ -218,6 +259,7 @@ class _CoinFieldState extends State<CoinField>
               floats: _floats,
               frames: _frames,
               pileRatio: _coins.isEmpty ? 0 : landed / _coins.length,
+              themeColor: widget.skin.themeColor,
             ),
             size: Size.infinite,
           ),
@@ -233,12 +275,14 @@ class _CoinPainter extends CustomPainter {
     required this.floats,
     required this.frames,
     required this.pileRatio,
+    required this.themeColor,
   });
 
   final List<_Coin> coins;
   final List<_FloatText> floats;
   final List<ui.Image> frames;
   final double pileRatio;
+  final Color themeColor; // 皮肤主题色（堆山/占位圆/飘字）
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -255,8 +299,8 @@ class _CoinPainter extends CustomPainter {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              kGold.withValues(alpha: 0.12 + 0.35 * pileRatio),
-              kGold.withValues(alpha: 0.1 + 0.55 * pileRatio),
+              themeColor.withValues(alpha: 0.12 + 0.35 * pileRatio),
+              themeColor.withValues(alpha: 0.1 + 0.55 * pileRatio),
             ],
           ).createShader(rect),
       );
@@ -281,7 +325,8 @@ class _CoinPainter extends CustomPainter {
 
       if (frames.isEmpty) {
         // 素材没加载完时的占位画法
-        canvas.drawCircle(Offset(c.x, c.y), c.size / 2, Paint()..color = kGold);
+        canvas.drawCircle(
+            Offset(c.x, c.y), c.size / 2, Paint()..color = themeColor);
         continue;
       }
       final img = frames[c.frame.clamp(0, frames.length - 1)];
@@ -301,7 +346,7 @@ class _CoinPainter extends CustomPainter {
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w900,
-            color: kGold.withValues(alpha: f.life),
+            color: themeColor.withValues(alpha: f.life),
             shadows: const [Shadow(color: Colors.black87, blurRadius: 4)],
           ),
         ),

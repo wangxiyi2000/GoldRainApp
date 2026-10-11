@@ -226,7 +226,9 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   // ── 动作 ─────────────────────────────────────────────
   Future<void> _openSettings() async {
     final result = await Navigator.of(context).push<AppSettings>(
-      MaterialPageRoute(builder: (_) => SettingsPage(initial: _settings)),
+      MaterialPageRoute(
+          builder: (_) =>
+              SettingsPage(initial: _settings, vaultCoins: _vaultCoins)),
     );
     if (result == null) return;
     await _store.saveSettings(result);
