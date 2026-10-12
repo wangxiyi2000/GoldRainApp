@@ -39,6 +39,8 @@ class _Coin {
   int frame;
   double spin = 0; // 帧推进计时（满 1 换下一帧）
   bool landed = false; // 已落地（停在落地线）
+  bool collecting = false; // 收仓中：飞向钱袋
+  bool dead = false; // 已被吸入袋口（下帧移除）
   double flash = 0; // 出生闪光，1 → 0
 }
 
@@ -50,10 +52,11 @@ class _Spark {
   double life = 1.0;
 }
 
-/// 出生瞬间的 "+1" 飘字
+/// 出生瞬间的 "+1" 飘字（可自定义文案，如收仓"已入仓"）
 class _FloatText {
-  _FloatText(this.x, this.y);
+  _FloatText(this.x, this.y, {this.text = '+1'});
   double x, y;
+  final String text;
   double life = 1.0;
 }
 
@@ -94,6 +97,9 @@ class CoinFieldState extends State<CoinField>
   static const _hourlyDuration = 4.0; // 持续 4 秒
   static const _shakeDuration = 0.5; // 爆屏屏震持续 0.5 秒
   static const _shakeAmp = 8.0; // 屏震最大振幅 px
+  static const _collectAt = 20; // 攒够 20 颗自动收仓（纯视觉，不动账本）
+  static const _collectMaxSec = 1.2; // 收仓动画最长时长（超时兜底清场）
+  static const _collectCooldownSec = 1.5; // 收仓冷却：防"收完立刻又收"的抽搐感
 
   late final Ticker _ticker;
   late final SoundPlayer _sound;
@@ -113,10 +119,23 @@ class CoinFieldState extends State<CoinField>
   double _hapticClock = 0;
   double _shakeTime = 0; // 屏震剩余时间（>0 则画面抖动）
   int _lastHourSurge = -1; // 已触发整点的"小时"，防同小时重复爆
+  double _collectClock = 0; // 收仓计时（>0 表示收仓进行中）
+  int _collectTarget = 0; // 本次收仓参与的金币数（吸满或超时即完成）
+  int _collectCount = 0; // 已吸入袋口的金币数
+  Offset _bagPos = Offset.zero; // 钱袋锚点（右下落地线附近）
+  double _collectCooldown = 0; // 收仓冷却（防连续抽搐）
 
   /// 实际出币速率（瀑布/整点/彩蛋期间临时放大）
   double get _effectiveSpawn =>
       widget.spawnPerSecond * (_surgeRemaining > 0 ? _surgeFactorNow : 1);
+
+  /// 是否正在收仓（供测试/调试观察）
+  bool get isCollecting => _collectClock > 0;
+
+  /// 当前屏幕金币数（供测试/调试观察）
+  int get coinCount => _coins.length;
+
+  bool get _collecting => _collectClock > 0;
 
   @override
   void initState() {
@@ -203,7 +222,7 @@ class CoinFieldState extends State<CoinField>
     // ④ 物理推进：重力 + 落地弹跳/堆积 + 溅火花
     final floor = _height - 150; // 落地线（在下方按钮区之上）
     for (final c in _coins) {
-      if (c.landed) continue;
+      if (c.landed || c.collecting) continue;
       c.vy += _gravity * dt;
       c.x += c.vx * dt;
       c.y += c.vy * dt;
@@ -255,7 +274,76 @@ class CoinFieldState extends State<CoinField>
       _coins.removeAt(0);
     }
 
+    // ⑨ 收仓：屏幕金币攒够 20 颗（非爆发期 + 非冷却）→ 钱袋出现，全部金币飞入
+    if (_collectCooldown > 0) _collectCooldown -= dt;
+    if (_collecting) {
+      _collectClock -= dt;
+      final bx = _bagPos.dx;
+      final by = _bagPos.dy;
+      for (final c in _coins) {
+        if (!c.collecting) continue;
+        final dx = bx - c.x;
+        final dy = by - c.y;
+        final dist = sqrt(dx * dx + dy * dy);
+        if (dist < 26) {
+          c.dead = true; // 吸入袋口，下帧移除
+          _collectCount++;
+          continue;
+        }
+        // 向钱袋加速（像被吸进去），飞得快自然转起来
+        c.vx += dx / dist * 2600 * dt;
+        c.vy += dy / dist * 2600 * dt;
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        c.spin += dt * 30;
+      }
+      _coins.removeWhere((c) => c.dead);
+      if (_collectClock <= 0 || _collectCount >= _collectTarget) {
+        _finishCollect(); // 入袋反馈 + 清残留
+      }
+    } else if (_coins.length >= _collectAt &&
+        _surgeRemaining <= 0 &&
+        _collectCooldown <= 0) {
+      _startCollect();
+    }
+
     setState(() {});
+  }
+
+  /// 触发收仓：钱袋出现在右下落地线，当前所有金币飞向钱袋（纯视觉，不动账本）
+  void _startCollect() {
+    _collectClock = _collectMaxSec;
+    _collectTarget = _coins.length;
+    _collectCount = 0;
+    _bagPos = Offset(_width - 64, _height - 150); // 钱袋坐在右下落地线上
+    for (final c in _coins) {
+      c.collecting = true;
+      c.landed = false;
+      final dx = _bagPos.dx - c.x;
+      final dy = _bagPos.dy - c.y;
+      final dist = max(1.0, sqrt(dx * dx + dy * dy));
+      c.vx = dx / dist * 900; // 初速指向钱袋
+      c.vy = dy / dist * 900;
+    }
+    _sound.whoosh(); // 收仓"唰"
+  }
+
+  /// 收仓完成：清残留金币 + 袋口闪光/飘字/叮 + 冷却
+  void _finishCollect() {
+    _coins.removeWhere((c) => c.collecting);
+    _collectClock = 0;
+    _collectCooldown = _collectCooldownSec;
+    _sound.ding();
+    _floats.add(_FloatText(_bagPos.dx, _bagPos.dy - 46, text: '已入仓'));
+    for (var i = 0; i < 8; i++) {
+      _sparks.add(_Spark(
+        x: _bagPos.dx,
+        y: _bagPos.dy,
+        vx: cos(i / 8 * 2 * pi) * 130,
+        vy: sin(i / 8 * 2 * pi) * 130 - 60,
+      ));
+    }
+    HapticFeedback.lightImpact();
   }
 
   /// 落地溅出 1~2 颗微尘火花（主题色小圆点，短命）
@@ -309,6 +397,8 @@ class CoinFieldState extends State<CoinField>
                 floats: _floats,
                 frames: _frames,
                 themeColor: widget.skin.themeColor,
+                collectPos: _collecting ? _bagPos : null,
+                collectPulse: _collectClock,
               ),
               size: Size.infinite,
             ),
@@ -336,16 +426,21 @@ class _CoinPainter extends CustomPainter {
     required this.floats,
     required this.frames,
     required this.themeColor,
+    required this.collectPos,
+    required this.collectPulse,
   });
 
   final List<_Coin> coins;
   final List<_Spark> sparks;
   final List<_FloatText> floats;
   final List<ui.Image> frames;
-  final Color themeColor; // 皮肤主题色（占位圆/火花/飘字）
+  final Color themeColor; // 皮肤主题色（占位圆/火花/飘字/袋口）
+  final Offset? collectPos; // 收仓中：钱袋锚点（null = 未收仓）
+  final double collectPulse; // 收仓计时（驱动钱袋脉动）
 
-  // 性能缓存：飘字 TextPainter 复用到画面变化才重建
+  // 性能缓存：飘字/钱袋"¥" TextPainter 复用到画面变化才重建
   TextPainter? _floatTp;
+  TextPainter? _bagTp;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -395,14 +490,55 @@ class _CoinPainter extends CustomPainter {
       }
     }
 
-    // "+1" 飘字（缓存 TextPainter，只换 style 省创建）
+    // 收仓钱袋：袋口金色 + 棕色袋身 + "¥"（脉动呼吸）
+    if (collectPos != null) {
+      final bx = collectPos!.dx;
+      final by = collectPos!.dy;
+      final p = 1 + 0.05 * sin(collectPulse * 30); // 脉动
+      final bag = Paint()..color = const Color(0xFF6B4A1F);
+      final bagLine = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = const Color(0xFF3E2A12);
+      // 袋身
+      final body = Path()
+        ..moveTo(bx - 20 * p, by - 8 * p)
+        ..quadraticBezierTo(bx - 25 * p, by + 22 * p, bx, by + 27 * p)
+        ..quadraticBezierTo(bx + 25 * p, by + 22 * p, bx + 20 * p, by - 8 * p)
+        ..close();
+      canvas.drawPath(body, bag);
+      canvas.drawPath(body, bagLine);
+      // 袋口
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+              center: Offset(bx, by - 12 * p), width: 44 * p, height: 12),
+          const Radius.circular(5),
+        ),
+        Paint()..color = themeColor,
+      );
+      // 袋身"¥"
+      final tp = _bagTp ??= TextPainter(textDirection: TextDirection.ltr);
+      tp.text = const TextSpan(
+        text: '¥',
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w900,
+          color: Color(0xFFF5E6C8),
+        ),
+      );
+      tp.layout();
+      tp.paint(canvas, Offset(bx - tp.width / 2, by + 2 - tp.height / 2));
+    }
+
+    // 飘字（"+1"/"已入仓"，缓存 TextPainter，只换 style 省创建）
     if (floats.isNotEmpty) {
       final tp = _floatTp ??= TextPainter(textDirection: TextDirection.ltr);
       for (final f in floats) {
         tp.text = TextSpan(
-          text: '+1',
+          text: f.text,
           style: TextStyle(
-            fontSize: 17,
+            fontSize: f.text == '+1' ? 17 : 15,
             fontWeight: FontWeight.w900,
             color: themeColor.withValues(alpha: f.life),
             shadows: const [Shadow(color: Colors.black87, blurRadius: 4)],

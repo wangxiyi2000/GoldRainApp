@@ -113,6 +113,12 @@ flutter build apk --release # 打正式包（约 20 MB）
 
 **真机首次运行**：手机连点 7 次"版本号"开开发者模式 → 打开 USB 调试 → 数据线连电脑 → 手机弹窗点"允许" → `flutter devices` 确认能看到手机 → `flutter run`。
 
+**发版安装（MIUI 已根治，一条命令直装，无需操作手机）**：
+```powershell
+adb install -r "E:\0_CodeProject\12_GoldRainApp\1_apk_files\搬砖爆金币-vX.Y.Z-arm64版-推荐.apk"
+adb shell am start -n com.example.gold_rain/.MainActivity   # 装完直接拉起验证
+```
+
 ---
 
 ## 6. M0 验收对照
@@ -125,3 +131,58 @@ flutter build apk --release # 打正式包（约 20 MB）
 - [ ] 真机上跑通 demo（**待用户插手机验证**）
 
 > 前 5 项已完成。最后一项需要你把安卓手机用数据线连上电脑，然后执行 `flutter run`。
+
+---
+
+## 7. MIUI 真机安装通道（adb 直装 · v0.6.0 根治 · 2026-10-12）
+
+> 现状：**已根治**。以后发版 `adb install -r` 一条命令直装，**不需要用户再操作手机**（不弹窗、不按指纹）。本节是排查记录 + 备用兜底方案。
+
+### 7.1 症状（根治前）
+
+- `adb install` / `pm install -r` / `INSTALL_PACKAGE` intent 一律报 `INSTALL_FAILED_USER_RESTRICTED`，Toast「Shell 没有权限安装」
+- 开发者选项「USB 安装」已开（`adb_install_need_confirm=0`）、未知来源已开（`install_non_market_apps=1`）、`appops set com.android.shell REQUEST_INSTALL_PACKAGES allow` 全部做了仍被拦
+- 走「文件管理器」路径能装，但**每次首次安装都要按指纹**，且白名单记录装完即被系统清空
+
+### 7.2 根因
+
+MIUI 13 的「增强安全模式」在 `com.miui.packageinstaller` 内部做强制来源校验，**绕过了 AOSP 标准通道**（`adb_install_need_confirm` / `REQUEST_INSTALL_PACKAGES`），所以开发者选项的开关看着开了实际无效。三个关键开关：
+
+| 设置键（secure） | 拦截值 → 已改 | 含义 |
+|---|---|---|
+| `miui_security_mode_style` | `enhance` → `basic` | 增强安全模式 |
+| `miui_safe_mode` | `1` → `0` | 安全模式 |
+| `installer_full_safe_version` | `1`（未动） | 完整安全版本，够用即可不必动 |
+
+### 7.3 根治命令（一次性，已执行）
+
+```powershell
+adb shell settings put secure miui_security_mode_style basic
+adb shell settings put secure miui_safe_mode 0
+# 读回确认：
+adb shell settings get secure miui_security_mode_style   # 应输出 basic
+adb shell settings get secure miui_safe_mode             # 应输出 0
+```
+
+手机侧可回退：设置 → 密码与安全 → 系统安全 → 增强安全模式（嫌不安全随时开回来，但会退回弹指纹状态）。
+
+### 7.4 验证
+
+- `adb install -r` 直接 `Success`，无弹窗、无指纹
+- `dumpsys package` 确认 `versionName` 正确，`am start` 拉起 App 正常
+
+### 7.5 备用兜底（若增强安全模式被重开 / 换机未关）
+
+文件管理器路径全自动安装（MIUI 拦 adb 时的唯一通道）：
+
+```powershell
+# 1) 推 APK 到手机 Download
+adb push "1_apk_files\xxx.apk" /sdcard/Download/
+# 2) 打开文件管理器并定位到 APK（MIUI 的 FileExplorerTabActivity）
+adb shell am start -n com.android.fileexplorer/.FileExplorerTabActivity
+adb shell uiautomator dump /sdcard/ui.xml && adb shell cat /sdcard/ui.xml   # 找 APK 文本 bounds
+adb shell input tap <x> <y>
+# 3) 首次会弹「安全验证」→ 需用户按一次指纹；确认后该来源本次放行
+```
+
+> 该白名单记录（`com.miui.packageinstaller_install_not_allow_package_<pkg>`）是**一次性**的，装完即清空，所以每次都弹指纹——根治后不再依赖此通道。

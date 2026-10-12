@@ -224,15 +224,29 @@ class _BigAmount extends StatelessWidget {
         tween: Tween(begin: 0, end: coins),
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeOut,
-        builder: (_, v, __) => Text(
-          formatCoins(v),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 58,
-            fontWeight: FontWeight.w900,
-            color: kGold,
-            shadows: [Shadow(color: kGoldDark, blurRadius: 30)],
+        builder: (_, v, __) => Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: formatCoins(v),
+                style: const TextStyle(
+                  fontSize: 58,
+                  fontWeight: FontWeight.w900,
+                  color: kGold,
+                  shadows: [Shadow(color: kGoldDark, blurRadius: 30)],
+                ),
+              ),
+              const TextSpan(
+                text: ' 元',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w600,
+                  color: kGold,
+                ),
+              ),
+            ],
           ),
+          textAlign: TextAlign.center,
         ),
       ),
     );

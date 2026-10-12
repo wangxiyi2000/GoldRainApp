@@ -88,11 +88,26 @@ class HomePage extends StatelessWidget {
                   style: const TextStyle(fontSize: 16, color: Colors.white70),
                 ),
                 const SizedBox(height: 10),
-                Text(formatCoins(todayCoins),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 40, fontWeight: FontWeight.w900, color: kGold)),
-                const Text('今日已赚（元）',
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                          text: formatCoins(todayCoins),
+                          style: const TextStyle(
+                              fontSize: 40,
+                              fontWeight: FontWeight.w900,
+                              color: kGold)),
+                      const TextSpan(
+                          text: ' 元',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: kGold)),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const Text('今日已赚',
                     style: TextStyle(color: Colors.grey, fontSize: 12)),
                 const SizedBox(height: 10),
                 Text(

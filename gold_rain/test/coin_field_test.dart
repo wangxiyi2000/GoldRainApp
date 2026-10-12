@@ -36,4 +36,27 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('CoinField 攒够 20 颗自动收仓：触发钱袋吸入并清空', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: CoinField(spawnPerSecond: 30),
+        ),
+      ),
+    );
+    final state = tester.state<CoinFieldState>(find.byType(CoinField));
+    // 高出生率跑 1 秒：屏幕金币超过 20 颗 → 触发收仓
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 33));
+    }
+    expect(state.isCollecting, isTrue, reason: '攒够 20 颗应触发收仓');
+    // 收仓动画（最长 1.2s）跑完：清空收集中的金币、收仓结束
+    for (var i = 0; i < 50; i++) {
+      await tester.pump(const Duration(milliseconds: 33));
+    }
+    expect(state.isCollecting, isFalse, reason: '收仓应在 1.2s 内结束');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
 }
