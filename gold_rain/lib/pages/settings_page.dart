@@ -26,7 +26,7 @@ class _SettingsPageState extends State<SettingsPage> {
   late bool _soundOn;
   late String _skinId;
 
-  static const _multipliers = [1, 10, 50, 100, 200];
+  static const _multipliers = [1, 10, 50, 100];
 
   @override
   void initState() {

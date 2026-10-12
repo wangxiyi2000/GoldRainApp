@@ -135,8 +135,7 @@ class _RainPageState extends State<RainPage> {
               const SizedBox(height: 10),
               Text(
                 '时薪 ${engine.hourlyRate.toStringAsFixed(2)} 元 ｜ '
-                '账本 ＋${engine.coinsPerSecond.toStringAsFixed(4)} 枚/秒'
-                '（屏幕 ×${widget.settings.visualMultiplier}）',
+                '${engine.purchasingPower(widget.coins)}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
               ),
