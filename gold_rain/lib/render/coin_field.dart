@@ -2,7 +2,7 @@
 // 只负责"把金币画得华丽"，每秒爆多少枚由 CoinEngine（spawnPerSecond）提供。
 //
 // 实现（手册 §5.3 骨架 + 增强）：
-//   · 重力下落 + 落地弹跳两次后堆积成"金堆"
+//   · 重力下落 + 落地弹跳两次后停在落地线堆积（v0.6.1 起不画底部金堆渐变带）
 //   · 金币精灵 4 帧旋转（帧 0→1→2→3 循环 = 旋转一圈）
 //   · 出生瞬间白色径向闪光 + "+1" 飘字上浮淡出
 //   · 每 60 秒一次"金币瀑布"（速率 ×20，3 秒）；P1 整点再爆一次更猛的（×40，4 秒）
@@ -38,7 +38,7 @@ class _Coin {
   double size;
   int frame;
   double spin = 0; // 帧推进计时（满 1 换下一帧）
-  bool landed = false; // 已落地（留在底部金堆）
+  bool landed = false; // 已落地（停在落地线）
   double flash = 0; // 出生闪光，1 → 0
 }
 
@@ -112,7 +112,6 @@ class CoinFieldState extends State<CoinField>
   double _surgeFactorNow = _surgeFactor; // 当前瀑布倍率（可被整点/彩蛋覆盖）
   double _hapticClock = 0;
   double _shakeTime = 0; // 屏震剩余时间（>0 则画面抖动）
-  int _landedCount = 0; // 已落地金币数（避免每帧 where 统计分配）
   int _lastHourSurge = -1; // 已触发整点的"小时"，防同小时重复爆
 
   /// 实际出币速率（瀑布/整点/彩蛋期间临时放大）
@@ -202,7 +201,7 @@ class CoinFieldState extends State<CoinField>
     }
 
     // ④ 物理推进：重力 + 落地弹跳/堆积 + 溅火花
-    final floor = _height - 150; // 底部金堆区（在下方按钮区之上，金堆可见）
+    final floor = _height - 150; // 落地线（在下方按钮区之上）
     for (final c in _coins) {
       if (c.landed) continue;
       c.vy += _gravity * dt;
@@ -221,8 +220,7 @@ class CoinFieldState extends State<CoinField>
         } else {
           c.vy = 0;
           c.landed = true;
-          c.y = floor - _rng.nextDouble() * 36; // 随机高度，堆出"金山"层次感
-          _landedCount++;
+          c.y = floor - _rng.nextDouble() * 36; // 随机高度，堆出层次感
           _splash(c); // 落地溅小金币
           if (_surgeRemaining > 0) {
             _sound.burstDing(); // 爆发期密集叮声
@@ -254,8 +252,7 @@ class CoinFieldState extends State<CoinField>
 
     // ⑧ 超限移除最老的金币（金山不无限涨）
     while (_coins.length > maxCoins) {
-      final removed = _coins.removeAt(0);
-      if (removed.landed) _landedCount--;
+      _coins.removeAt(0);
     }
 
     setState(() {});
@@ -311,7 +308,6 @@ class CoinFieldState extends State<CoinField>
                 sparks: _sparks,
                 floats: _floats,
                 frames: _frames,
-                pileRatio: _coins.isEmpty ? 0 : _landedCount / _coins.length,
                 themeColor: widget.skin.themeColor,
               ),
               size: Size.infinite,
@@ -339,7 +335,6 @@ class _CoinPainter extends CustomPainter {
     required this.sparks,
     required this.floats,
     required this.frames,
-    required this.pileRatio,
     required this.themeColor,
   });
 
@@ -347,39 +342,14 @@ class _CoinPainter extends CustomPainter {
   final List<_Spark> sparks;
   final List<_FloatText> floats;
   final List<ui.Image> frames;
-  final double pileRatio;
-  final Color themeColor; // 皮肤主题色（堆山/占位圆/飘字）
+  final Color themeColor; // 皮肤主题色（占位圆/火花/飘字）
 
-  // 性能缓存：金堆渐变 Paint 与飘字 TextPainter 复用到画面变化才重建
-  double _lastPileRatio = -1;
-  Rect _pileRect = Rect.zero;
-  Paint? _pilePaint;
+  // 性能缓存：飘字 TextPainter 复用到画面变化才重建
   TextPainter? _floatTp;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..filterQuality = FilterQuality.medium;
-
-    // 底部金堆：落地越多，金堆越高越亮（向上长到金币落地区）。
-    // 高度/透明度随 pileRatio 缓慢变化，变化小于阈值时复用上次的渐变（省每帧建 shader）
-    if (pileRatio > 0.02) {
-      final pileH = 8 + 150 * pileRatio;
-      final rect = Rect.fromLTWH(0, size.height - pileH, size.width, pileH);
-      if (_pilePaint == null || (pileRatio - _lastPileRatio).abs() > 0.004) {
-        _lastPileRatio = pileRatio;
-        _pileRect = rect;
-        _pilePaint = Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              themeColor.withValues(alpha: 0.12 + 0.35 * pileRatio),
-              themeColor.withValues(alpha: 0.1 + 0.55 * pileRatio),
-            ],
-          ).createShader(rect);
-      }
-      canvas.drawRect(_pileRect, _pilePaint!);
-    }
 
     for (final c in coins) {
       // 出生闪光（白色径向光晕，一帧即逝）

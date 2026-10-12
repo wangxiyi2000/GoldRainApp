@@ -1,7 +1,7 @@
 name: gold_rain
 description: "搬砖爆金币——上班打卡，金币实时爆屏的情绪价值 App（M0 demo）"
 publish_to: "none"
-version: 0.6.0+7
+version: 0.6.1+8
 
 environment:
   sdk: ^3.5.0
