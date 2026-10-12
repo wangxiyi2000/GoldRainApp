@@ -1,4 +1,4 @@
-// 金币粒子场（M2 核心爽感 + P1）——CustomPainter 每帧自绘，逻辑与渲染分离。
+// 金币粒子场（M2 核心爽感 + P1 + v0.5.0 改进版）——CustomPainter 每帧自绘，逻辑与渲染分离。
 // 只负责"把金币画得华丽"，每秒爆多少枚由 CoinEngine（spawnPerSecond）提供。
 //
 // 实现（手册 §5.3 骨架 + 增强）：
@@ -8,6 +8,10 @@
 //   · 每 60 秒一次"金币瀑布"（速率 ×20，3 秒）；P1 整点再爆一次更猛的（×40，4 秒）
 //   · P1 音效：金币落地"叮"（限频）+ 瀑布"唰"，有静音开关
 //   · P1 皮肤：精灵图与主题色由 CoinSkin 提供（金库余额解锁）
+//   · v0.5.0 爆屏屏震：任何爆发（瀑布/整点/彩蛋）的头 0.5s 屏幕随机抖动衰减
+//   · v0.5.0 落地溅小金币：金币落地溅出 1~2 颗微尘火花（短命淡出）
+//   · v0.5.0 瀑布密集叮声：爆发期间叮声放宽限频到 40ms、音量稍大（噼里啪啦）
+//   · v0.5.0 彩蛋：公开 CoinFieldState.triggerSurge()，页面可随时引爆大爆发
 //   · 触觉反馈限频 5 次/秒；粒子硬上限 maxCoins = 300（防越爆越卡）
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -36,6 +40,14 @@ class _Coin {
   double spin = 0; // 帧推进计时（满 1 换下一帧）
   bool landed = false; // 已落地（留在底部金堆）
   double flash = 0; // 出生闪光，1 → 0
+}
+
+/// 落地溅出的微尘火花（短命、淡出、越小越亮）
+class _Spark {
+  _Spark({required this.x, required this.y, required this.vx, required this.vy});
+
+  double x, y, vx, vy;
+  double life = 1.0;
 }
 
 /// 出生瞬间的 "+1" 飘字
@@ -67,10 +79,10 @@ class CoinField extends StatefulWidget {
   final ValueChanged<int>? onHourlySurge;
 
   @override
-  State<CoinField> createState() => _CoinFieldState();
+  State<CoinField> createState() => CoinFieldState();
 }
 
-class _CoinFieldState extends State<CoinField>
+class CoinFieldState extends State<CoinField>
     with SingleTickerProviderStateMixin {
   static const maxCoins = 300; // 粒子硬上限：保命，防止越爆越卡
   static const _gravity = 900.0; // 重力加速度 px/s²
@@ -80,11 +92,14 @@ class _CoinFieldState extends State<CoinField>
   static const _surgeFactor = 20.0; // 瀑布期间速率 ×20
   static const _hourlyFactor = 40.0; // P1 整点大爆发：速率 ×40
   static const _hourlyDuration = 4.0; // 持续 4 秒
+  static const _shakeDuration = 0.5; // 爆屏屏震持续 0.5 秒
+  static const _shakeAmp = 8.0; // 屏震最大振幅 px
 
   late final Ticker _ticker;
   late final SoundPlayer _sound;
   Duration? _lastTick;
   final List<_Coin> _coins = [];
+  final List<_Spark> _sparks = [];
   final List<_FloatText> _floats = [];
   final Random _rng = Random();
   final List<ui.Image> _frames = [];
@@ -94,11 +109,13 @@ class _CoinFieldState extends State<CoinField>
   double _spawnAcc = 0;
   double _surgeRemaining = 0;
   double _surgeClock = 0;
-  double _surgeFactorNow = _surgeFactor; // 当前瀑布倍率（可被整点覆盖）
+  double _surgeFactorNow = _surgeFactor; // 当前瀑布倍率（可被整点/彩蛋覆盖）
   double _hapticClock = 0;
+  double _shakeTime = 0; // 屏震剩余时间（>0 则画面抖动）
+  int _landedCount = 0; // 已落地金币数（避免每帧 where 统计分配）
   int _lastHourSurge = -1; // 已触发整点的"小时"，防同小时重复爆
 
-  /// 实际出币速率（瀑布/整点期间临时放大）
+  /// 实际出币速率（瀑布/整点/彩蛋期间临时放大）
   double get _effectiveSpawn =>
       widget.spawnPerSecond * (_surgeRemaining > 0 ? _surgeFactorNow : 1);
 
@@ -136,6 +153,14 @@ class _CoinFieldState extends State<CoinField>
     }
   }
 
+  /// 引爆一次大爆发（瀑布/整点/彩蛋共用）：指定倍率与时长
+  void triggerSurge({double factor = _surgeFactor, double duration = _surgeDuration}) {
+    _surgeRemaining = duration;
+    _surgeFactorNow = factor;
+    _shakeTime = _shakeDuration; // 爆屏屏震
+    _sound.whoosh(); // 爆发"唰"
+  }
+
   void _update(Duration elapsed) {
     // 用真实 dt（而非固定 1/60）：掉帧时动画不加速，切后台回来跳过超大帧
     final dt = _lastTick == null
@@ -153,7 +178,7 @@ class _CoinFieldState extends State<CoinField>
       _surgeClock += dt;
       if (_surgeClock >= _surgeEvery) {
         _surgeClock = 0;
-        _startSurge();
+        triggerSurge();
       }
     }
 
@@ -161,7 +186,7 @@ class _CoinFieldState extends State<CoinField>
     final now = DateTime.now();
     if (now.minute == 0 && _lastHourSurge != now.hour) {
       _lastHourSurge = now.hour;
-      _startSurge(factor: _hourlyFactor, duration: _hourlyDuration);
+      triggerSurge(factor: _hourlyFactor, duration: _hourlyDuration);
       widget.onHourlySurge?.call(now.hour);
     }
 
@@ -171,12 +196,12 @@ class _CoinFieldState extends State<CoinField>
       _spawnAcc += rate * dt;
       while (_spawnAcc >= 1 && _coins.length < maxCoins) {
         _spawnAcc -= 1;
-        // 瀑布/整点期间不飘字（太多会糊），平时每枚都飘 "+1"
+        // 爆发期间不飘字（太多会糊），平时每枚都飘 "+1"
         _spawn(x: _rng.nextDouble() * _width, showText: _surgeRemaining <= 0);
       }
     }
 
-    // ④ 物理推进：重力 + 落地弹跳/堆积
+    // ④ 物理推进：重力 + 落地弹跳/堆积 + 溅火花
     final floor = _height - 150; // 底部金堆区（在下方按钮区之上，金堆可见）
     for (final c in _coins) {
       if (c.landed) continue;
@@ -197,31 +222,57 @@ class _CoinFieldState extends State<CoinField>
           c.vy = 0;
           c.landed = true;
           c.y = floor - _rng.nextDouble() * 36; // 随机高度，堆出"金山"层次感
-          _sound.ding(); // P1 落地"叮"（播放器内部限频）
+          _landedCount++;
+          _splash(c); // 落地溅小金币
+          if (_surgeRemaining > 0) {
+            _sound.burstDing(); // 爆发期密集叮声
+          } else {
+            _sound.ding(); // 平时"叮"（播放器内部限频）
+          }
         }
       }
     }
 
-    // ⑤ 飘字上浮淡出
+    // ⑤ 火花：微重力上抛后散落、淡出
+    for (final s in _sparks) {
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.vy += 500 * dt;
+      s.life -= dt * 3.2;
+    }
+    _sparks.removeWhere((s) => s.life <= 0);
+
+    // ⑥ 飘字上浮淡出
     for (final f in _floats) {
       f.y -= 46 * dt;
       f.life -= dt * 1.1;
     }
     _floats.removeWhere((f) => f.life <= 0);
 
-    // ⑥ 超限移除最老的金币（金山不无限涨）
+    // ⑦ 屏震计时衰减
+    if (_shakeTime > 0) _shakeTime -= dt;
+
+    // ⑧ 超限移除最老的金币（金山不无限涨）
     while (_coins.length > maxCoins) {
-      _coins.removeAt(0);
+      final removed = _coins.removeAt(0);
+      if (removed.landed) _landedCount--;
     }
 
     setState(() {});
   }
 
-  /// 触发一次瀑布/整点大爆发（可指定倍率与时长）
-  void _startSurge({double factor = _surgeFactor, double duration = _surgeDuration}) {
-    _surgeRemaining = duration;
-    _surgeFactorNow = factor;
-    _sound.whoosh(); // P1 爆发"唰"
+  /// 落地溅出 1~2 颗微尘火花（主题色小圆点，短命）
+  void _splash(_Coin c) {
+    if (_sparks.length >= 80) return; // 火花上限，防爆
+    final n = 1 + _rng.nextInt(2);
+    for (var i = 0; i < n; i++) {
+      _sparks.add(_Spark(
+        x: c.x,
+        y: c.y,
+        vx: (_rng.nextDouble() - 0.5) * 160,
+        vy: -40 - _rng.nextDouble() * 90,
+      ));
+    }
   }
 
   void _spawn({required double x, bool showText = false}) {
@@ -251,20 +302,33 @@ class _CoinFieldState extends State<CoinField>
       builder: (context, constraints) {
         _width = constraints.maxWidth;
         _height = constraints.maxHeight;
-        final landed = _coins.where((c) => c.landed).length;
         return RepaintBoundary(
-          child: CustomPaint(
-            painter: _CoinPainter(
-              coins: _coins,
-              floats: _floats,
-              frames: _frames,
-              pileRatio: _coins.isEmpty ? 0 : landed / _coins.length,
-              themeColor: widget.skin.themeColor,
+          child: Transform.translate(
+            offset: _shakeOffset,
+            child: CustomPaint(
+              painter: _CoinPainter(
+                coins: _coins,
+                sparks: _sparks,
+                floats: _floats,
+                frames: _frames,
+                pileRatio: _coins.isEmpty ? 0 : _landedCount / _coins.length,
+                themeColor: widget.skin.themeColor,
+              ),
+              size: Size.infinite,
             ),
-            size: Size.infinite,
           ),
         );
       },
+    );
+  }
+
+  /// 屏震偏移：爆发头 0.5s 内随机抖动，随时间衰减到 0
+  Offset get _shakeOffset {
+    if (_shakeTime <= 0) return Offset.zero;
+    final k = _shakeAmp * (_shakeTime / _shakeDuration);
+    return Offset(
+      (_rng.nextDouble() - 0.5) * 2 * k,
+      (_rng.nextDouble() - 0.5) * 2 * k,
     );
   }
 }
@@ -272,6 +336,7 @@ class _CoinFieldState extends State<CoinField>
 class _CoinPainter extends CustomPainter {
   _CoinPainter({
     required this.coins,
+    required this.sparks,
     required this.floats,
     required this.frames,
     required this.pileRatio,
@@ -279,22 +344,31 @@ class _CoinPainter extends CustomPainter {
   });
 
   final List<_Coin> coins;
+  final List<_Spark> sparks;
   final List<_FloatText> floats;
   final List<ui.Image> frames;
   final double pileRatio;
   final Color themeColor; // 皮肤主题色（堆山/占位圆/飘字）
 
+  // 性能缓存：金堆渐变 Paint 与飘字 TextPainter 复用到画面变化才重建
+  double _lastPileRatio = -1;
+  Rect _pileRect = Rect.zero;
+  Paint? _pilePaint;
+  TextPainter? _floatTp;
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..filterQuality = FilterQuality.medium;
 
-    // 底部金堆：落地越多，金堆越高越亮（向上长到金币落地区）
+    // 底部金堆：落地越多，金堆越高越亮（向上长到金币落地区）。
+    // 高度/透明度随 pileRatio 缓慢变化，变化小于阈值时复用上次的渐变（省每帧建 shader）
     if (pileRatio > 0.02) {
       final pileH = 8 + 150 * pileRatio;
       final rect = Rect.fromLTWH(0, size.height - pileH, size.width, pileH);
-      canvas.drawRect(
-        rect,
-        Paint()
+      if (_pilePaint == null || (pileRatio - _lastPileRatio).abs() > 0.004) {
+        _lastPileRatio = pileRatio;
+        _pileRect = rect;
+        _pilePaint = Paint()
           ..shader = LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -302,8 +376,9 @@ class _CoinPainter extends CustomPainter {
               themeColor.withValues(alpha: 0.12 + 0.35 * pileRatio),
               themeColor.withValues(alpha: 0.1 + 0.55 * pileRatio),
             ],
-          ).createShader(rect),
-      );
+          ).createShader(rect);
+      }
+      canvas.drawRect(_pileRect, _pilePaint!);
     }
 
     for (final c in coins) {
@@ -338,10 +413,23 @@ class _CoinPainter extends CustomPainter {
       );
     }
 
-    // "+1" 飘字
-    for (final f in floats) {
-      final tp = TextPainter(
-        text: TextSpan(
+    // 落地溅火花：主题色小圆点，随生命值缩小淡出
+    if (sparks.isNotEmpty) {
+      for (final s in sparks) {
+        final r = 1.5 + s.life * 2;
+        canvas.drawCircle(
+          Offset(s.x, s.y),
+          r,
+          Paint()..color = themeColor.withValues(alpha: 0.75 * s.life),
+        );
+      }
+    }
+
+    // "+1" 飘字（缓存 TextPainter，只换 style 省创建）
+    if (floats.isNotEmpty) {
+      final tp = _floatTp ??= TextPainter(textDirection: TextDirection.ltr);
+      for (final f in floats) {
+        tp.text = TextSpan(
           text: '+1',
           style: TextStyle(
             fontSize: 17,
@@ -349,10 +437,10 @@ class _CoinPainter extends CustomPainter {
             color: themeColor.withValues(alpha: f.life),
             shadows: const [Shadow(color: Colors.black87, blurRadius: 4)],
           ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(f.x - tp.width / 2, f.y - tp.height / 2));
+        );
+        tp.layout();
+        tp.paint(canvas, Offset(f.x - tp.width / 2, f.y - tp.height / 2));
+      }
     }
   }
 

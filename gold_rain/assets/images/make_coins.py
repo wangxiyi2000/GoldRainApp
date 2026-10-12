@@ -1,8 +1,8 @@
-"""Generate 4-frame gold coin sprites for M2 (transparent PNG, 256px).
+"""Generate 4-frame gold coin sprites for M2 (transparent PNG, 128px).
 
 Frames = one coin rotating: front (0) -> tilt (1) -> edge (2) -> tilt (3).
 Cycling 0->1->2->3->0 in the particle engine gives a continuous spin.
-Every frame shares the same 256x256 canvas and centered position so the
+Every frame shares the same 128x128 canvas and centered position so the
 animation doesn't jump.
 """
 
@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 
 OUT_DIR = os.path.dirname(os.path.abspath(__file__))
-SIZE = 256
+SIZE = 128
 
 # 金币配色（中心亮 -> 外圈暗）
 CORE = (255, 228, 110)
@@ -52,18 +52,20 @@ def draw_front():
         d.ellipse([cx - rr, cy - rr, cx + rr, cy + rr],
                   fill=lerp(EDGE, CORE, t * t) + (255,))
 
-    # 外圈 rim + 内圈细边
-    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=RIM + (255,), width=8)
+    # 外圈 rim + 内圈细边（线宽随画布等比缩放）
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=RIM + (255,),
+              width=max(2, int(SIZE * 0.031)))
     r2 = r * 0.82
-    d.ellipse([cx - r2, cy - r2, cx + r2, cy + r2], outline=EDGE + (255,), width=3)
+    d.ellipse([cx - r2, cy - r2, cx + r2, cy + r2], outline=EDGE + (255,),
+              width=max(1, int(SIZE * 0.012)))
 
     # 左上高光弧 + 右下暗部弧（3D 立体感）
     box = [cx - r * 0.78, cy - r * 0.78, cx + r * 0.78, cy + r * 0.78]
-    d.arc(box, 195, 335, fill=(255, 255, 255, 80), width=15)
-    d.arc(box, 15, 165, fill=(70, 48, 0, 70), width=15)
+    d.arc(box, 195, 335, fill=(255, 255, 255, 80), width=int(SIZE * 0.059))
+    d.arc(box, 15, 165, fill=(70, 48, 0, 70), width=int(SIZE * 0.059))
 
     # ¥ 符号
-    font = load_font(120)
+    font = load_font(int(SIZE * 0.47))
     text = "¥"
     bbox = d.textbbox((0, 0), text, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
@@ -86,7 +88,8 @@ def edge_frame(base):
     """侧视帧：压到很薄，中间加一道竖向高光模拟金属边缘"""
     img = squash(base, 0.20)
     d = ImageDraw.Draw(img)
-    d.line([SIZE / 2, 18, SIZE / 2, SIZE - 18], fill=(255, 240, 180, 170), width=4)
+    d.line([SIZE / 2, SIZE * 0.07, SIZE / 2, SIZE * 0.93],
+           fill=(255, 240, 180, 170), width=max(1, int(SIZE * 0.016)))
     return img
 
 

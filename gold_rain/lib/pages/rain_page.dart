@@ -1,7 +1,8 @@
-// 搬砖中页面（PRD v1.3 + M2 + P1）：金币实时爆屏 + 金额 3 位小数连续跳动。
+// 搬砖中页面（PRD v1.3 + M2 + P1 + v0.5.0）：金币实时爆屏 + 金额 3 位小数连续跳动。
 // 不需要「下班打卡」——过了下班时间会自动收工、自动入库。
 // M2：叠上 CoinField 金币粒子动画（灵魂功能）。
 // P1：整点大爆发时弹「恭喜存活到 X 点」提示条；皮肤/音效设置透传给粒子场。
+// v0.5.0：今日收益每跨 ¥100 触发彩蛋——×100 大爆发 + 「今日破百」提示条。
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -31,16 +32,44 @@ class RainPage extends StatefulWidget {
 }
 
 class _RainPageState extends State<RainPage> {
-  String? _toastText; // 整点提示条文案（null = 不显示）
+  final GlobalKey<CoinFieldState> _fieldKey = GlobalKey<CoinFieldState>();
+  String? _toastText; // 提示条文案（整点 / 彩蛋共用，null = 不显示）
   Timer? _toastTimer;
+  late int _eggLevel; // 今日已跨过的"百元档位"（彩蛋去重）
 
-  /// 整点大爆发：弹「恭喜存活到 X 点」，3 秒后自动消失
-  void _onHourlySurge(int hour) {
+  // 彩蛋：今日收益跨过整百的瞬间，引爆 ×100 大爆发（每档只触发一次）
+  int get _eggDiv => 100;
+
+  @override
+  void initState() {
+    super.initState();
+    _eggLevel = widget.coins ~/ _eggDiv; // 进页面就已在某档，不触发
+  }
+
+  /// 统一弹提示条，3 秒后自动消失
+  void _showToast(String text) {
     _toastTimer?.cancel();
-    setState(() => _toastText = '恭喜存活到 $hour 点！金币雨 ×40');
+    setState(() => _toastText = text);
     _toastTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) setState(() => _toastText = null);
     });
+  }
+
+  /// 整点大爆发：弹「恭喜存活到 X 点」
+  void _onHourlySurge(int hour) {
+    _showToast('恭喜存活到 $hour 点！金币雨 ×40');
+  }
+
+  @override
+  void didUpdateWidget(covariant RainPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 彩蛋：今日收益跨过整百的瞬间，引爆 ×100 大爆发（每档只触发一次）
+    final level = widget.coins ~/ _eggDiv;
+    if (level > _eggLevel && level >= 1) {
+      _eggLevel = level;
+      _fieldKey.currentState?.triggerSurge(factor: 100, duration: 6);
+      _showToast('今日破百！彩蛋 ×100');
+    }
   }
 
   @override
@@ -61,6 +90,7 @@ class _RainPageState extends State<RainPage> {
         // 金币粒子层（传「屏幕出币速率」= 账本速率 × 视觉倍率；皮肤/音效/整点回调一起透传）
         Positioned.fill(
           child: CoinField(
+            key: _fieldKey,
             spawnPerSecond: engine.spawnPerSecond,
             skin: widget.settings.skin,
             soundOn: widget.settings.soundEnabled,

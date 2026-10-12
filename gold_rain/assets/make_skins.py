@@ -1,4 +1,4 @@
-# 一次性工具：程序化生成 P1 全部皮肤精灵（5 套 × 4 帧，256px 透明底）。
+# 一次性工具：程序化生成 P1 全部皮肤精灵（4 套 × 4 帧，128px 透明底）。
 # 帧约定：0=正面 → 1=侧转 30° → 2=侧缘 → 3=侧转 30°，循环 = 旋转一圈。
 # 输出到 assets/skins/<id>/0..3.png，与 lib/render/skins.dart 的 framePaths 对应。
 import os
@@ -7,9 +7,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(ROOT, 'skins')
-SIZE = 256
+SIZE = 128
 
-SKINS = ['gold', 'redpack', 'milktea', 'diamond', 'paycheck']
+# 注意：gold 皮肤复用 assets/images/coin_*（make_coins.py 生成），这里不重复生成
+SKINS = ['redpack', 'milktea', 'diamond', 'paycheck']
 
 
 def font(size):
@@ -36,42 +37,46 @@ def draw_shape(kind):
     if kind == 'gold':
         r = S * 0.42
         d.ellipse([c - r, c - r, c + r, c + r],
-                  fill=(255, 215, 0, 255), outline=(184, 134, 11, 255), width=10)
+                  fill=(255, 215, 0, 255), outline=(184, 134, 11, 255), width=int(S * 0.04))
         d.ellipse([c - r * 0.82, c - r * 0.82, c + r * 0.82, c + r * 0.82],
-                  outline=(255, 235, 120, 255), width=4)
+                  outline=(255, 235, 120, 255), width=int(S * 0.016))
         glyph = '¥'
     elif kind == 'redpack':
         w, h = S * 0.66, S * 0.80
         x0, y0 = c - w / 2, c - h / 2
-        d.rounded_rectangle([x0, y0, x0 + w, y0 + h], radius=14,
-                            fill=(255, 77, 79, 255), outline=(200, 20, 30, 255), width=8)
-        d.rounded_rectangle([x0, c - 18, x0 + w, c + 18], radius=10, fill=(255, 215, 0, 255))
+        d.rounded_rectangle([x0, y0, x0 + w, y0 + h], radius=int(S * 0.055),
+                            fill=(255, 77, 79, 255), outline=(200, 20, 30, 255), width=int(S * 0.031))
+        band = S * 0.07
+        d.rounded_rectangle([x0, c - band, x0 + w, c + band], radius=int(S * 0.04),
+                            fill=(255, 215, 0, 255))
         glyph = '福'
     elif kind == 'milktea':
         w, h = S * 0.60, S * 0.78
         x0, y0 = c - w / 2, c - h / 2
-        d.rounded_rectangle([x0, y0, x0 + w, y0 + h], radius=22,
-                            fill=(198, 134, 66, 255), outline=(120, 70, 30, 255), width=8)
-        d.ellipse([x0 - 14, y0 - 30, x0 + w + 14, y0 + 46], fill=(255, 240, 220, 255))
-        d.line([c + 20, y0 - 46, c + 44, y0 - 90], fill=(255, 120, 150, 255), width=16)
+        d.rounded_rectangle([x0, y0, x0 + w, y0 + h], radius=int(S * 0.086),
+                            fill=(198, 134, 66, 255), outline=(120, 70, 30, 255), width=int(S * 0.031))
+        d.ellipse([x0 - S * 0.05, y0 - S * 0.12, x0 + w + S * 0.05, y0 + S * 0.18],
+                  fill=(255, 240, 220, 255))
+        d.line([c + S * 0.08, y0 - S * 0.18, c + S * 0.17, y0 - S * 0.35],
+               fill=(255, 120, 150, 255), width=int(S * 0.06))
         glyph = '茶'
     elif kind == 'diamond':
         pts = [(c, c - S * 0.42), (c + S * 0.30, c), (c, c + S * 0.42), (c - S * 0.30, c)]
         d.polygon(pts, fill=(77, 216, 255, 255), outline=(20, 100, 200, 255))
-        d.line([c, c - S * 0.42, c, c + S * 0.42], fill=(255, 255, 255, 255), width=4)
-        d.line([c - S * 0.30, c, c + S * 0.30, c], fill=(255, 255, 255, 255), width=4)
+        d.line([c, c - S * 0.42, c, c + S * 0.42], fill=(255, 255, 255, 255), width=int(S * 0.016))
+        d.line([c - S * 0.30, c, c + S * 0.30, c], fill=(255, 255, 255, 255), width=int(S * 0.016))
         glyph = '钻'
     else:  # paycheck 工资条
         w, h = S * 0.62, S * 0.84
         x0, y0 = c - w / 2, c - h / 2
-        d.rounded_rectangle([x0, y0, x0 + w, y0 + h], radius=10,
-                            fill=(76, 217, 100, 255), outline=(20, 140, 60, 255), width=8)
+        d.rounded_rectangle([x0, y0, x0 + w, y0 + h], radius=int(S * 0.039),
+                            fill=(76, 217, 100, 255), outline=(20, 140, 60, 255), width=int(S * 0.031))
         for i in range(4):
             yy = y0 + h * 0.22 + i * h * 0.14
-            d.line([x0 + w * 0.18, yy, x0 + w * 0.82, yy], fill=(255, 255, 255, 255), width=7)
+            d.line([x0 + w * 0.18, yy, x0 + w * 0.82, yy], fill=(255, 255, 255, 255), width=int(S * 0.027))
         glyph = '薪'
 
-    f = font(70)
+    f = font(int(S * 0.27))
     bbox = d.textbbox((0, 0), glyph, font=f)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
     d.text((c - tw / 2 - bbox[0], c - th / 2 - bbox[1]), glyph, font=f,
