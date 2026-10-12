@@ -66,6 +66,13 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   Timer? _timer;
   Duration _tickPeriod = Duration.zero;
 
+  // v0.6.0 彩蛋补放：记录"最近一次庆祝彩蛋的日期与档位"（跨天重置）
+  String? _eggDate;
+  int _eggLevelStored = 0;
+
+  /// 今日有效的彩蛋档位（跨天或首次使用 → 0，即从第一档开始补放）
+  int get _eggLevel => _eggDate == _dayKey(_today) ? _eggLevelStored : 0;
+
   // ── 派生数据 ──────────────────────────────────────────
   Shift get _shift => _settings.toShift();
   CoinEngine get _engine => _settings.toEngine();
@@ -86,6 +93,14 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
       if (_sameDay(r.day, _today)) return r;
     }
     return null;
+  }
+
+  /// v0.6.0：彩蛋档位前进（实时跨百 / 补放共用），持久化防止同档重复庆祝
+  Future<void> _saveEggLevel(int level) async {
+    final key = _dayKey(_today);
+    _eggDate = key;
+    _eggLevelStored = level;
+    await _store.saveEggState(key, level);
   }
 
   static DateTime _day0(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -119,6 +134,11 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
   // ── 启动 ─────────────────────────────────────────────
   Future<void> _boot() async {
     _settings = await _store.loadSettings();
+
+    // v0.6.0：读取彩蛋档位（错过跨百时补放彩蛋用）
+    final (eggDate, eggLevel) = await _store.loadEggState();
+    _eggDate = eggDate;
+    _eggLevelStored = eggLevel;
 
     // 首次使用日 = 金库补造起点
     var firstDay = await _store.loadFirstUseDay();
@@ -304,6 +324,8 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
         settings: _settings,
         coins: _todayCoins,
         elapsed: st.worked,
+        eggLevel: _eggLevel,
+        onEggAdvanced: _saveEggLevel,
         onOpenVault: _openVault,
         onOpenSettings: _openSettings,
       );

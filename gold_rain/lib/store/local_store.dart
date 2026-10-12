@@ -1,9 +1,10 @@
 // 本地持久化（shared_preferences）——全部数据都在手机本地，卸载即清零。
 //
-// PRD v1.3 起不再有"打卡会话"，只存三样东西：
+// PRD v1.3 起不再有"打卡会话"，只存这几样东西：
 //   1. app_settings   用户设置（月薪 / 上下班时间 / 视觉倍率）→ 重开 App 不用重新填
 //   2. first_use_day  首次使用日 → 金库自动补造历史的起点
 //   3. daily_reports  历史战报列表 → **金库总额 = 所有战报金额之和**（不单独存总额，避免重复计数）
+//   4. egg_date/egg_level  v0.6.0：彩蛋已庆祝到的"百元档位"（按天记录，跨天重置）→ 错过跨百也能补放彩蛋
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +16,8 @@ class LocalStore {
   static const kSettings = 'app_settings';
   static const kFirstUseDay = 'first_use_day';
   static const kReports = 'daily_reports';
+  static const kEggDate = 'egg_date'; // 最近一次彩蛋庆祝的日期（yyyy-MM-dd）
+  static const kEggLevel = 'egg_level'; // 该日已庆祝到的百元档位
 
   // ── 用户设置 ──────────────────────────────────────────
   Future<AppSettings> loadSettings() async {
@@ -101,4 +104,18 @@ class LocalStore {
   }
 
   static String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+  // ── 彩蛋档位（v0.6.0：错过跨百也能补放）─────────────────
+  /// 读取最近一次彩蛋庆祝的（日期, 档位）。从未庆祝过 → (null, 0)。
+  Future<(String?, int)> loadEggState() async {
+    final p = await SharedPreferences.getInstance();
+    return (p.getString(kEggDate), p.getInt(kEggLevel) ?? 0);
+  }
+
+  /// 记录今天已庆祝到的百元档位（跨天由调用方判断重置）
+  Future<void> saveEggState(String date, int level) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(kEggDate, date);
+    await p.setInt(kEggLevel, level);
+  }
 }

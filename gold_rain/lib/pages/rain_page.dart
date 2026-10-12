@@ -1,8 +1,10 @@
-// 搬砖中页面（PRD v1.3 + M2 + P1 + v0.5.0）：金币实时爆屏 + 金额 3 位小数连续跳动。
+// 搬砖中页面（PRD v1.3 + M2 + P1 + v0.5.0 + v0.6.0）：金币实时爆屏 + 金额 3 位小数连续跳动。
 // 不需要「下班打卡」——过了下班时间会自动收工、自动入库。
 // M2：叠上 CoinField 金币粒子动画（灵魂功能）。
 // P1：整点大爆发时弹「恭喜存活到 X 点」提示条；皮肤/音效设置透传给粒子场。
 // v0.5.0：今日收益每跨 ¥100 触发彩蛋——×100 大爆发 + 「今日破百」提示条。
+// v0.6.0：彩蛋补放——错过跨百、下次打开 App 时补放一次彩蛋（「你错过的彩蛋」），
+//         档位持久化在 main 层（eggDate/eggLevel），这里只负责检测与引爆。
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -17,6 +19,8 @@ class RainPage extends StatefulWidget {
     required this.settings,
     required this.coins,
     required this.elapsed,
+    required this.eggLevel,
+    required this.onEggAdvanced,
     required this.onOpenVault,
     required this.onOpenSettings,
   });
@@ -24,6 +28,13 @@ class RainPage extends StatefulWidget {
   final AppSettings settings;
   final double coins; // 今日已赚（元），由「上班时间 → 现在」推算
   final Duration elapsed; // 已搬砖时长
+
+  /// 今日已庆祝到的"百元档位"（main 层持久化，跨天自动归 0）
+  final int eggLevel;
+
+  /// 彩蛋档位前进回调（跨百 / 补放共用），由 main 层持久化防重复
+  final ValueChanged<int> onEggAdvanced;
+
   final VoidCallback onOpenVault;
   final VoidCallback onOpenSettings;
 
@@ -35,7 +46,7 @@ class _RainPageState extends State<RainPage> {
   final GlobalKey<CoinFieldState> _fieldKey = GlobalKey<CoinFieldState>();
   String? _toastText; // 提示条文案（整点 / 彩蛋共用，null = 不显示）
   Timer? _toastTimer;
-  late int _eggLevel; // 今日已跨过的"百元档位"（彩蛋去重）
+  late int _eggLevel; // 今日已庆祝到的"百元档位"（彩蛋去重）
 
   // 彩蛋：今日收益跨过整百的瞬间，引爆 ×100 大爆发（每档只触发一次）
   int get _eggDiv => 100;
@@ -43,7 +54,15 @@ class _RainPageState extends State<RainPage> {
   @override
   void initState() {
     super.initState();
-    _eggLevel = widget.coins ~/ _eggDiv; // 进页面就已在某档，不触发
+    _eggLevel = widget.eggLevel; // 从持久化档位起步
+    // 补放：首帧后检查"已跨过但没庆祝过"的档位（此时 CoinField 已挂载，可引爆）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final level = widget.coins ~/ _eggDiv;
+      if (level > _eggLevel && level >= 1) {
+        _celebrate(level, missed: true);
+      }
+    });
   }
 
   /// 统一弹提示条，3 秒后自动消失
@@ -60,15 +79,22 @@ class _RainPageState extends State<RainPage> {
     _showToast('恭喜存活到 $hour 点！金币雨 ×40');
   }
 
+  /// 庆祝一次彩蛋（实时跨百 missed=false / 补放 missed=true），每档只庆祝一次
+  void _celebrate(int level, {required bool missed}) {
+    _eggLevel = level;
+    widget.onEggAdvanced(level); // 持久化，防同档重复
+    _fieldKey.currentState?.triggerSurge(factor: 100, duration: 6);
+    _showToast(
+        missed ? '你错过的彩蛋：已入账 ¥${level * _eggDiv}' : '今日破百！彩蛋 ×100');
+  }
+
   @override
   void didUpdateWidget(covariant RainPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 彩蛋：今日收益跨过整百的瞬间，引爆 ×100 大爆发（每档只触发一次）
+    // 实时彩蛋：开着 App 时今日收益跨过整百的瞬间引爆（每档只触发一次）
     final level = widget.coins ~/ _eggDiv;
     if (level > _eggLevel && level >= 1) {
-      _eggLevel = level;
-      _fieldKey.currentState?.triggerSurge(factor: 100, duration: 6);
-      _showToast('今日破百！彩蛋 ×100');
+      _celebrate(level, missed: false);
     }
   }
 

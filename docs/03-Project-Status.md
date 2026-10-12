@@ -113,7 +113,7 @@
 | `lib/render/coin_field.dart` | **【M2 核心 + v0.5.0 改进】**金币粒子场：真实 dt 物理（重力/弹跳衰减/落地随机高度成"金山"）、4 帧精灵旋转、出生白色径向闪光、"+1" 飘字、每 60 秒 ×20 金币瀑布 3 秒、触觉限频 5 次/秒、`maxCoins=300` 硬上限；**v0.5.0**：爆屏屏震（`_shakeTime` 0.5s 衰减 ±8px）、落地溅 1~2 颗火花、爆发期 `burstDing()` 密集叮声、公开 `CoinFieldState.triggerSurge()` 供彩蛋引爆；性能：`_landedCount` 计数、飘字 TextPainter 缓存、金堆 shader 复用 |
 | `lib/render/sound_player.dart` | 音效播放器（P1 + v0.5.0）：懒加载 AudioPlayer 全程 try/catch 静默；`ding()`（120ms 限频）/ `whoosh()` / **`burstDing()`（40ms 限频、音量 0.3）** |
 | `assets/images/` | 金币精灵 `coin_0~3.png`（**128px** 透明底：正面/侧倾/侧视/侧倾，¥ 符号 + 高光/暗部），由 `make_coins.py` 一键生成 |
-| `test/` | **33 个用例全过**：`coin_engine_test`(8) + `report_generator_test`(3) + `shift_test`(15) + `coin_field_test`(2) + `skins_test`(5) |
+| `test/` | **35 个用例全过**：`coin_engine_test`(8) + `report_generator_test`(3) + `shift_test`(15) + `coin_field_test`(2) + `skins_test`(5) + `local_store_test`(2) |
 
 ### 5.2 未实现 / 缺口 ⚠️（后续开发要补的）
 
@@ -136,14 +136,15 @@
 | **皮肤系统** | P1 | ✅ **已完成**：5 套皮肤（金币/红包/奶茶/钻石/工资条），金库余额解锁，设置页切换（真机截图 `preview-p1-redpack-rain.png`） |
 | **M2 改进版（屏震/火花/密集叮声）** | M2 | ✅ **已完成（v0.5.0）**：爆屏屏震 + 落地溅火花 + 爆发期密集叮声，真机录屏验证满屏瀑布与屏震 |
 | **今日破百彩蛋** | P1 | ✅ **已完成（v0.5.0）**：今日收益每跨 ¥100 触发 `triggerSurge(factor:100, duration:6)` + 「今日破百！彩蛋 ×100」提示条（rain_page `didUpdateWidget` 跨档检测，`_eggDiv=100`） |
+| **彩蛋补放（错过跨百也能庆祝）** | P1 | ✅ **已完成（v0.6.0）**：档位持久化到 local_store（`egg_date`/`egg_level`，跨天重置）；打开 App 时若今日已跨档但未庆祝 → 立即补放一次 ×100 大爆发 + 「你错过的彩蛋：已入账 ¥xxx」提示条（真机截图 `preview-v6-egg.png`：满屏金币 + 「你错过的彩蛋：已入账 ¥420」） |
 | ~~App 名称/图标~~ | M4 | ✅ 已完成：`android:label="搬砖爆金币"`；图标「金币+红砖」已覆盖 5 档 mipmap（脚本 `assets/icon/make_icons.py`） |
-| **打包分发** | M4 | ✅ 已完成：release 出包 + `--split-per-abi --obfuscate`（arm64 16.5MB，v0.5.0），成品放 `1_apk_files/`；用 Flutter 测试签名，未做正式签名 |
+| **打包分发** | M4 | ✅ 已完成：release 出包 + `--split-per-abi --obfuscate`（arm64 16.6MB，v0.6.0），成品放 `1_apk_files/`；用 Flutter 测试签名，未做正式签名 |
 
 ---
 
-## 6. 下一步（v0.5.0 完成 → P2 增强）
+## 6. 下一步（v0.6.0 完成 → P2 增强）
 
-M2 改进版 + 彩蛋（v0.5.0）已落地并通过真机验证（屏震/火花/密集叮声/满屏瀑布），arm64 APK 压到 16.5MB。接下来按性价比排序：
+彩蛋补放（v0.6.0）已落地并通过真机验证：错过跨百、下次打开 App 即补放彩蛋 + 提示，档位按天持久化不重复。接下来按性价比排序：
 
 1. **P2 桌面小组件**：锁屏/桌面显示"今日已赚"，实现见手册 §10
 2. **P2 金库更多玩法**：皮肤解锁动效、抽卡彩蛋、成就徽章
