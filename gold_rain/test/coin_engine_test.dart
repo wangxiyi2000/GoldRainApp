@@ -64,9 +64,10 @@ void main() {
 
   test('购买力换算文案分档正确（1 枚 = 1 元）', () {
     final e = CoinEngine(monthlySalary: 10000);
-    expect(e.purchasingPower(0), contains('辣条')); // 0 元 → 辣条档
+    expect(e.purchasingPower(0), contains('辣条')); // 0 元 → 辣条百分比档
+    expect(e.purchasingPower(12), contains('螺蛳粉')); // 12 元 → 螺蛳粉档
     expect(e.purchasingPower(20), contains('奶茶')); // 20 元 → 奶茶档
-    expect(e.purchasingPower(150), contains('日料')); // 150 元 → 日料档
+    expect(e.purchasingPower(50), contains('烧烤')); // 50 元 → 烧烤档
     expect(e.purchasingPower(300), contains('海底捞')); // 300 元 → 海底捞档
   });
 }

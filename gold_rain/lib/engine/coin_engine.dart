@@ -46,12 +46,14 @@ class CoinEngine {
   int coinsFor(Duration d) => coinsEarned(d).floor();
 
   /// 换算文案：金币 → 生活购买力（纯玩梗）。1 枚 = 1 元
+  /// v0.6.9 档位更新（贴近日常开销）：3 辣条 / 12 螺蛳粉 / 15 奶茶 / 50 烧烤 / 200 海底捞
   String purchasingPower(double coins) {
     final yuan = coins;
-    if (yuan >= 200) return '≈ 海底捞一顿 🍲';
-    if (yuan >= 100) return '≈ 高档日料放题 🍣';
+    if (yuan >= 200) return '≈ 海底捞 ${(yuan / 200).toStringAsFixed(1)} 顿 🍲';
+    if (yuan >= 50) return '≈ 烧烤 ${(yuan / 50).toStringAsFixed(1)} 顿 🍢';
     if (yuan >= 15) return '≈ 奶茶 ${(yuan / 15).toStringAsFixed(1)} 杯 🧋';
-    if (yuan >= 5) return '≈ 早餐 ${(yuan / 5).toStringAsFixed(1)} 份 🥟';
-    return '≈ 一根辣条的 ${yuan.toStringAsFixed(1)}% 🌶️';
+    if (yuan >= 12) return '≈ 螺蛳粉 ${(yuan / 12).toStringAsFixed(1)} 碗 🍜';
+    if (yuan >= 3) return '≈ 辣条 ${(yuan / 3).toStringAsFixed(1)} 包 🌶️';
+    return '≈ 一根辣条的 ${(yuan * 100 / 3).toStringAsFixed(1)}% 🌶️';
   }
 }
