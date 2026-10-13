@@ -223,11 +223,16 @@ class _BigAmount extends StatelessWidget {
         tween: Tween(begin: 0, end: coins),
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeOut,
-        builder: (_, v, __) => Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: formatCoins(v),
+        builder: (_, v, __) => Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            // 金额区域占满剩余宽度、右对齐紧贴"元"：位数再变也不影响"元"的位置
+            Expanded(
+              child: Text(
+                formatCoins(v),
+                textAlign: TextAlign.right,
+                maxLines: 1,
                 style: const TextStyle(
                   fontSize: 58,
                   fontWeight: FontWeight.w900,
@@ -235,17 +240,16 @@ class _BigAmount extends StatelessWidget {
                   shadows: [Shadow(color: kGoldDark, blurRadius: 30)],
                 ),
               ),
-              const TextSpan(
-                text: ' 元',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w600,
-                  color: kGold,
-                ),
+            ),
+            const Text(
+              ' 元',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w600,
+                color: kGold,
               ),
-            ],
-          ),
-          textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
