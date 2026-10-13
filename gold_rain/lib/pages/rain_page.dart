@@ -129,7 +129,7 @@ class _RainPageState extends State<RainPage> {
           child: Column(
             children: [
               const SizedBox(height: 28),
-              Text('努力进行中…收益实时到账 ✨',
+              Text('努力搬砖中…收益实时到账 ✨',
                   style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
               const Spacer(),
               _BigAmount(coins: widget.coins),
@@ -142,7 +142,7 @@ class _RainPageState extends State<RainPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                '已投入 ${formatDuration(widget.elapsed)} ｜ '
+                '已搬砖 ${formatDuration(widget.elapsed)} ｜ '
                 '距 ${widget.settings.workEndLabel} 下班还有 ${formatDuration(remaining)}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
