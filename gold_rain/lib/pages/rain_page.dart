@@ -224,20 +224,25 @@ class _BigAmount extends StatelessWidget {
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeOut,
         builder: (_, v, __) => Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            // 金额区域占满剩余宽度、右对齐紧贴"元"：位数再变也不影响"元"的位置
-            Expanded(
-              child: Text(
-                formatCoins(v),
-                textAlign: TextAlign.right,
-                maxLines: 1,
-                style: const TextStyle(
-                  fontSize: 58,
-                  fontWeight: FontWeight.w900,
-                  color: kGold,
-                  shadows: [Shadow(color: kGoldDark, blurRadius: 30)],
+            // 金额区固定宽度 + 右对齐贴"元"：整组恒定居中，"元"字绝不随数字位数移动；
+            // 超长金额自动缩小（scaleDown）不换行不溢出
+            SizedBox(
+              width: 280,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  formatCoins(v),
+                  style: const TextStyle(
+                    fontSize: 58,
+                    fontWeight: FontWeight.w900,
+                    color: kGold,
+                    shadows: [Shadow(color: kGoldDark, blurRadius: 30)],
+                  ),
                 ),
               ),
             ),
