@@ -44,12 +44,22 @@ class _FinancePageState extends State<FinancePage> {
   }
 
   void _save() {
-    if (_takeHome <= 0) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('到手工资要大于 0 哦')));
+    final th = _takeHome;
+    if (th <= 0) {
+      _toast('到手工资要大于 0 哦');
       return;
     }
-    Navigator.of(context).pop(_takeHome);
+    if (th > widget.settings.monthlySalary) {
+      _toast('到手工资不能高于月薪（${widget.settings.monthlySalary.toStringAsFixed(0)} 元）');
+      return;
+    }
+    Navigator.of(context).pop(th);
+  }
+
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
   /// ¥ 金额（千分位、取整）
@@ -110,6 +120,23 @@ class _FinancePageState extends State<FinancePage> {
                   style: TextStyle(color: kGold, fontSize: 12)),
             ),
           ),
+          // 到手工资 > 月薪：给个醒目提醒
+          if (th > monthlySalary) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    size: 16, color: Colors.orange),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '到手工资一般不会高于月薪（${monthlySalary.toStringAsFixed(0)} 元），请检查一下',
+                    style: const TextStyle(color: Colors.orange, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 24),
 
           // ── 方案说明 ──
