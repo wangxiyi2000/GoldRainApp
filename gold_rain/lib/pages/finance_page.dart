@@ -261,7 +261,7 @@ class _FinancePageState extends State<FinancePage> {
           GoldButton(label: '保存', onTap: _save),
           const SizedBox(height: 16),
           Text(
-            '本方案是通用参考，请结合所在城市、房租与家庭情况灵活调整。',
+            '本方案是通用参考，请结合所在城市、房租与家庭情况调整',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
           ),
