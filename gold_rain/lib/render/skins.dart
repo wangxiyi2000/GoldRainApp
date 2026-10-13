@@ -49,32 +49,6 @@ const kRedpackSkin = CoinSkin(
   ],
 );
 
-const kMilkTeaSkin = CoinSkin(
-  id: 'milktea',
-  name: '奶茶',
-  themeColor: Color(0xFFC68642),
-  unlockCoins: 300,
-  framePaths: [
-    'assets/skins/milktea/0.png',
-    'assets/skins/milktea/1.png',
-    'assets/skins/milktea/2.png',
-    'assets/skins/milktea/3.png',
-  ],
-);
-
-const kDiamondSkin = CoinSkin(
-  id: 'diamond',
-  name: '钻石',
-  themeColor: Color(0xFF4DD8FF),
-  unlockCoins: 800,
-  framePaths: [
-    'assets/skins/diamond/0.png',
-    'assets/skins/diamond/1.png',
-    'assets/skins/diamond/2.png',
-    'assets/skins/diamond/3.png',
-  ],
-);
-
 const kPaycheckSkin = CoinSkin(
   id: 'paycheck',
   name: '工资条',
@@ -92,8 +66,6 @@ const kPaycheckSkin = CoinSkin(
 const kSkins = [
   kGoldSkin,
   kRedpackSkin,
-  kMilkTeaSkin,
-  kDiamondSkin,
   kPaycheckSkin,
 ];
 
