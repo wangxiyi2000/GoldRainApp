@@ -68,7 +68,10 @@ void main() {
     expect(e.purchasingPower(12), contains('螺蛳粉')); // 12 元 → 螺蛳粉档
     expect(e.purchasingPower(20), contains('奶茶')); // 20 元 → 奶茶档
     expect(e.purchasingPower(50), contains('烧烤')); // 50 元 → 烧烤档
-    expect(e.purchasingPower(300), contains('海底捞')); // 300 元 → 海底捞档
+    expect(e.purchasingPower(250), contains('海底捞')); // 250 元 → 海底捞档
+    expect(e.purchasingPower(300), contains('自助')); // 300 元 → 双人自助档
+    expect(e.purchasingPower(599), contains('球鞋')); // 599 元 → AJ 球鞋档
+    expect(e.purchasingPower(999), contains('AirPods')); // 999 元 → AirPods 4 档
     expect(e.purchasingPower(2000), contains('演唱会')); // 2000 元 → 演唱会档
     expect(e.purchasingPower(4000), contains('PS5')); // 4000 元 → PS5 档
     expect(e.purchasingPower(8000), contains('iPhone')); // 8000 元 → iPhone 档

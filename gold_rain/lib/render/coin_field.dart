@@ -284,7 +284,9 @@ class CoinFieldState extends State<CoinField>
       _coins.removeAt(0);
     }
 
-    // ⑨ 收仓：屏幕金币攒够 20 颗（非爆发期 + 非冷却）→ 钱袋出现，全部金币飞入
+    // ⑨ 收仓：屏幕金币攒够 N 颗（非冷却）→ 钱袋出现，全部金币飞入。
+    //     v0.6.11 起不再要求"非爆发期"：爆发期间同样收仓（金币直接飞进钱袋），
+    //     同时消除测试环境与真实整点时钟的偶发耦合。
     if (_collectCooldown > 0) _collectCooldown -= dt;
     if (_collecting) {
       _collectClock -= dt;
@@ -311,9 +313,7 @@ class CoinFieldState extends State<CoinField>
       if (_collectClock <= 0 || _collectCount >= _collectTarget) {
         _finishCollect(); // 入袋反馈 + 清残留
       }
-    } else if (_coins.length >= _collectAt &&
-        _surgeRemaining <= 0 &&
-        _collectCooldown <= 0) {
+    } else if (_coins.length >= _collectAt && _collectCooldown <= 0) {
       _startCollect();
     }
 
