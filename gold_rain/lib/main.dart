@@ -15,6 +15,7 @@ import 'engine/coin_engine.dart';
 import 'models/app_settings.dart';
 import 'models/daily_report.dart';
 import 'models/shift.dart';
+import 'pages/finance_page.dart';
 import 'pages/home_page.dart';
 import 'pages/rain_page.dart';
 import 'pages/report_page.dart';
@@ -291,6 +292,18 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
     ));
   }
 
+  /// 理财页：返回新的到手工资（null = 用户没保存），写进设置
+  Future<void> _openFinance() async {
+    final result = await Navigator.of(context).push<double>(
+      MaterialPageRoute(builder: (_) => FinancePage(settings: _settings)),
+    );
+    if (result == null) return;
+    final updated = _settings.copyWith(takeHomePay: result);
+    await _store.saveSettings(updated);
+    if (!mounted) return;
+    setState(() => _settings = updated);
+  }
+
   // ── 渲染 ─────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -327,6 +340,7 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
         eggLevel: _eggLevel,
         onEggAdvanced: _saveEggLevel,
         onOpenVault: _openVault,
+        onOpenFinance: _openFinance,
         onOpenSettings: _openSettings,
       );
     }
@@ -352,6 +366,7 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
       onOpenReport:
           report == null ? null : () => setState(() => _viewingReport = true),
       onOpenVault: _openVault,
+      onOpenFinance: _openFinance,
       onOpenSettings: _openSettings,
     );
   }

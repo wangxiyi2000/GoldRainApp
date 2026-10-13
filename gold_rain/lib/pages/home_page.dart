@@ -24,6 +24,7 @@ class HomePage extends StatelessWidget {
     required this.recent,
     required this.onOpenReport,
     required this.onOpenVault,
+    required this.onOpenFinance,
     required this.onOpenSettings,
   });
 
@@ -35,6 +36,7 @@ class HomePage extends StatelessWidget {
   final List<DailyReport> recent; // 最近几天（新的在前）
   final VoidCallback? onOpenReport; // 已收工才有
   final VoidCallback onOpenVault;
+  final VoidCallback onOpenFinance;
   final VoidCallback onOpenSettings;
 
   @override
@@ -154,7 +156,16 @@ class HomePage extends StatelessWidget {
                   onTap: onOpenVault,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MiniCard(
+                  icon: '💰',
+                  label: '理财',
+                  value: '月度预算',
+                  onTap: onOpenFinance,
+                ),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: _MiniCard(
                   icon: '⚙️',

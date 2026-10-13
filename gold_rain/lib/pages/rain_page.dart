@@ -22,6 +22,7 @@ class RainPage extends StatefulWidget {
     required this.eggLevel,
     required this.onEggAdvanced,
     required this.onOpenVault,
+    required this.onOpenFinance,
     required this.onOpenSettings,
   });
 
@@ -36,6 +37,7 @@ class RainPage extends StatefulWidget {
   final ValueChanged<int> onEggAdvanced;
 
   final VoidCallback onOpenVault;
+  final VoidCallback onOpenFinance;
   final VoidCallback onOpenSettings;
 
   @override
@@ -156,6 +158,12 @@ class _RainPageState extends State<RainPage> {
                     icon:
                         const Icon(Icons.account_balance, size: 18, color: kGold),
                     label: const Text('金库', style: TextStyle(color: kGold)),
+                  ),
+                  const SizedBox(width: 12),
+                  TextButton.icon(
+                    onPressed: widget.onOpenFinance,
+                    icon: const Icon(Icons.savings, size: 18, color: kGold),
+                    label: const Text('理财', style: TextStyle(color: kGold)),
                   ),
                   const SizedBox(width: 12),
                   TextButton.icon(

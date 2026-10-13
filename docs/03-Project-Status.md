@@ -1,6 +1,9 @@
 # 《搬砖爆金币》项目现状与开发交接
 
-> 版本：v2.9 ｜ 日期：2026-10-13 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> 版本：v3.0 ｜ 日期：2026-10-13 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> **v3.0 变更**：**v0.6.16 新增「理财」页（P2 重大功能）**——①底部导航由「金库 / 设置」两钮改为**「金库 / 理财 / 设置」三钮**（搬砖页 + 首页同步）。②新增 `engine/finance_plan.dart`（纯逻辑、可单测）+ `pages/finance_page.dart`：按**「到手工资」**（非月薪）用 **50/30/20 法则**（Elizabeth Warren《All Your Worth》——50% 必要开销 / 30% 生活享受 / 20% 储蓄投资）给出**月度 + 日均**预算，并按国情拆子项（房租 22% / 吃饭 16% / 交通 4% / 水电 4% / 保险 4%；聚餐 10% / 衣饰 8% / 旅行 6% / 爱好 6%；应急金 8% / 稳健储蓄 7% / 基金定投 5%）。另含「今天建议花（必要+享受 ÷30）」「应急金目标（3~6 个月必要开销）」与防月光贴士。③`AppSettings` 新增 **`takeHomePay`**（0 = 未设置，按月薪 ×0.8 估算；旧存档向后兼容）。44 测试 + analyze 通过。
+> 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
+>
 > **v2.9 变更**：**v0.6.15 文案微调**（用户二次确认用语）——搬砖页顶部"努力进行中…" → **"努力搬砖中…收益实时到账 ✨"**；搬砖页第二行"已投入" → **"已搬砖"**（回归"搬砖"口语）；设置页说明"周末好好休息" → **"周末休息！"**。其余文案保持 v2.8 状态。36 测试 + analyze 通过。
 > 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
 >
@@ -72,6 +75,7 @@
     │   ├── theme.dart          # 主色常量 + formatCoins/formatDuration + GoldButton/SectionLabel
     │   ├── engine/
     │   │   ├── coin_engine.dart      # 数值引擎（纯逻辑，可单测）
+    │   │   ├── finance_plan.dart     # 【v3.0】理财规划引擎：50/30/20 法则（到手工资 → 月度/日均预算）
     │   │   └── report_generator.dart # 战报文案引擎（日期种子）
     │   ├── models/
     │   │   ├── app_settings.dart     # 月薪/上下班时间/工作日/倍率 + isWorkday + toShift
@@ -86,6 +90,7 @@
     │       ├── rain_page.dart        # 搬砖中：金额 3 位小数连续跳动 + CoinField 金币爆屏
     │       ├── report_page.dart      # 今日战报（自动入库，只展示）
     │       ├── vault_page.dart       # 金库：累计 + 历史战报
+    │       ├── finance_page.dart     # 【v3.0】理财：到手工资录入 + 50/30/20 月度/日均预算
     │       └── settings_page.dart    # 月薪/时间/工作日/倍率
     ├── assets/icon/            # App 图标（app_icon.png 主图 + make_icons.py 生成脚本）
     ├── assets/images/          # 金币精灵 coin_0~3.png（4 帧旋转）+ make_coins.py 生成脚本
