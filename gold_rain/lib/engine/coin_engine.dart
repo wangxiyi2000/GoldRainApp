@@ -47,8 +47,12 @@ class CoinEngine {
 
   /// 换算文案：金币 → 生活购买力（纯玩梗）。1 枚 = 1 元
   /// v0.6.9 档位更新（贴近日常开销）：3 辣条 / 12 螺蛳粉 / 15 奶茶 / 50 烧烤 / 200 海底捞
+  /// v0.6.10 增加高档热门商品（3C+文娱）：1280 演唱会 / 3999 PS5 / 7999 iPhone 17 Pro
   String purchasingPower(double coins) {
     final yuan = coins;
+    if (yuan >= 7999) return '≈ iPhone 17 Pro ${(yuan / 7999).toStringAsFixed(1)} 部 📱';
+    if (yuan >= 3999) return '≈ PS5 游戏机 ${(yuan / 3999).toStringAsFixed(1)} 台 🎮';
+    if (yuan >= 1280) return '≈ 演唱会内场票 ${(yuan / 1280).toStringAsFixed(1)} 张 🎤';
     if (yuan >= 200) return '≈ 海底捞 ${(yuan / 200).toStringAsFixed(1)} 顿 🍲';
     if (yuan >= 50) return '≈ 烧烤 ${(yuan / 50).toStringAsFixed(1)} 顿 🍢';
     if (yuan >= 15) return '≈ 奶茶 ${(yuan / 15).toStringAsFixed(1)} 杯 🧋';
