@@ -150,7 +150,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const SizedBox(height: 6),
           Text(
-            '到点自动开始搬砖、到点自动收工入库，不用打卡；周末不算钱',
+            '到点自动开始积累、到点自动收工入账，不用打卡；周末好好休息',
             style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
           ),
           const SizedBox(height: 20),

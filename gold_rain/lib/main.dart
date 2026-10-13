@@ -184,9 +184,9 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
 
     String? banner;
     if (backfilled > 0) {
-      banner = '已自动补齐 $backfilled 天搬砖记录 🧱';
+      banner = '已自动补齐 $backfilled 天历史收益 ✅';
     } else if (bankedToday) {
-      banner = '今日已收工，工资已自动入库 ✅';
+      banner = '今日已收工，努力已自动入账 ✅';
     }
 
     if (!mounted) return;
@@ -239,7 +239,7 @@ class _AppRootState extends State<AppRoot> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {
       _reports = reports;
-      _banner = '今日已收工，工资已自动入库 ✅';
+      _banner = '今日已收工，努力已自动入账 ✅';
     });
   }
 

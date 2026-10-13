@@ -74,9 +74,9 @@ class _RainPageState extends State<RainPage> {
     });
   }
 
-  /// 整点大爆发：弹「恭喜存活到 X 点」
+  /// 整点大爆发：弹「又到 X 点啦」
   void _onHourlySurge(int hour) {
-    _showToast('恭喜存活到 $hour 点！金币雨 ×40');
+    _showToast('太棒了，又到 $hour 点！金币雨 ×40 🎉');
   }
 
   /// 庆祝一次彩蛋（实时跨百 missed=false / 补放 missed=true），每档只庆祝一次
@@ -129,7 +129,7 @@ class _RainPageState extends State<RainPage> {
           child: Column(
             children: [
               const SizedBox(height: 28),
-              Text('搬砖中…血汗钱实时到账',
+              Text('努力进行中…收益实时到账 ✨',
                   style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
               const Spacer(),
               _BigAmount(coins: widget.coins),
@@ -142,7 +142,7 @@ class _RainPageState extends State<RainPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                '已搬 ${formatDuration(widget.elapsed)} ｜ '
+                '已投入 ${formatDuration(widget.elapsed)} ｜ '
                 '距 ${widget.settings.workEndLabel} 下班还有 ${formatDuration(remaining)}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13),

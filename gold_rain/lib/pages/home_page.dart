@@ -58,7 +58,7 @@ class HomePage extends StatelessWidget {
               style: TextStyle(
                   fontSize: 32, fontWeight: FontWeight.w900, color: kGold)),
           const SizedBox(height: 6),
-          Text('血汗钱可视化工程 · 1 元 = 1 枚金币',
+          Text('努力可视化 · 每 1 元 = 1 枚金币 ✨',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
           const SizedBox(height: 4),
@@ -112,11 +112,11 @@ class HomePage extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   isRest
-                      ? '周末不算钱，好好休息 · $nextWorkday ${settings.workStartLabel} 开爆'
+                      ? '周末好好休息，养精蓄锐 · $nextWorkday ${settings.workStartLabel} 开爆'
                       : isBefore
                           ? '${settings.workStartLabel} 开爆 · '
                               '还有 ${formatDuration(settings.toShift().startAt(now).difference(now))}'
-                          : '金币已定格，明天 ${settings.workStartLabel} 继续 💪',
+                          : '今日收获已入账，明天 ${settings.workStartLabel} 继续加油 💪',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                 ),
@@ -137,7 +137,7 @@ class HomePage extends StatelessWidget {
           const SectionLabel('最近收益'),
           const SizedBox(height: 8),
           if (recent.isEmpty)
-            Text('还没有搬砖记录，到了上班时间会自动开始 💪',
+            Text('还没有收益记录，到了上班时间就会自动开始 🌱',
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13))
           else
             ...recent.map((r) => _ReportTile(r)),

@@ -55,7 +55,7 @@ class ReportPage extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 20, color: Colors.white70)),
         const SizedBox(height: 8),
-        Text('搬砖时长 ${formatDuration(report.worked)}',
+        Text('投入时长 ${formatDuration(report.worked)}',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
         const SizedBox(height: 8),

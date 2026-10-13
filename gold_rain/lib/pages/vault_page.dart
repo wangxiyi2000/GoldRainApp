@@ -47,7 +47,7 @@ class VaultPage extends StatelessWidget {
               style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
           const SizedBox(height: 12),
           if (reports.isEmpty)
-            Text('还没有记录。到了上班时间会自动开始搬砖 💪',
+            Text('还没有记录，到了上班时间就会自动开始 🌱',
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 13))
           else
             ...reports.map((r) => _ReportTile(r)),
@@ -94,7 +94,7 @@ class _ReportTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text('搬砖 ${formatDuration(r.worked)}',
+                Text('投入 ${formatDuration(r.worked)}',
                     style:
                         TextStyle(color: Colors.grey.shade600, fontSize: 12)),
               ],
