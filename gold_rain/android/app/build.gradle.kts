@@ -29,6 +29,29 @@ android {
         versionName = flutter.versionName
     }
 
+    // AGP 8 默认关闭 resValues；产品风味用 resValue 定义 app_name 需要显式开启
+    buildFeatures {
+        resValues = true
+    }
+
+    // 产品风味：
+    //   prod = 正式版（applicationId 保持 com.example.gold_rain，数据/签名与历史版本一致）
+    //   demo = 演示/调试版（独立包名 com.example.gold_rain.demo，安装后是「另一个 App」，
+    //          数据与正式版互不相通；仅应用名不同，其余功能完全一致）
+    flavorDimensions += "mode"
+    productFlavors {
+        create("prod") {
+            dimension = "mode"
+            applicationId = "com.example.gold_rain"
+            resValue("string", "app_name", "搬砖爆金币")
+        }
+        create("demo") {
+            dimension = "mode"
+            applicationId = "com.example.gold_rain.demo"
+            resValue("string", "app_name", "搬砖爆金币·演示")
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.

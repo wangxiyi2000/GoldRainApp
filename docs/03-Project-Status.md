@@ -1,6 +1,9 @@
 # 《搬砖爆金币》项目现状与开发交接
 
-> 版本：v3.3 ｜ 日期：2026-10-13 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> 版本：v3.4 ｜ 日期：2026-10-13 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> **v3.4 变更**：**v0.6.19 增加「演示版」双风味构建**——`android/app/build.gradle.kts` 新增 `flavorDimensions "mode"` + 两个 productFlavor：**prod**（`com.example.gold_rain`，应用名「搬砖爆金币」＝正式版，数据/签名与历史版本完全一致）与 **demo**（`com.example.gold_rain.demo`，应用名「搬砖爆金币·演示」＝演示/调试版）。demo 是**独立 App**：包名不同 → 数据（SharedPreferences/战报/月薪等）与正式版**完全隔离**，可并排安装；除应用名外的功能与正式版**一模一样**。`AndroidManifest` 的 `android:label` 改为 `@string/app_name`（由风味 `resValue` 提供，需开 `buildFeatures.resValues = true`）。**构建命令变动**：正式版 `flutter build apk --flavor prod …`，演示版 `--flavor demo …`（产物名 `app-arm64-v8a-{prod,demo}-release.apk`）。已归档 `1_apk_files/搬砖爆金币-演示版-v0.6.19-arm64.apk`。⚠️ MIUI 对全新包名安装会拦截（纯净模式），演示版首次装需手机放行一次（见 `04-M0-Env-Setup.md` §7）。正式版产物 `com.example.gold_rain` 不受影响（已用 aapt 校验）。
+> 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
+>
 > **v3.3 变更**：**v0.6.19 性能/稳定性专项优化（功能零改动）**——`coin_field.dart` 重构：①**去掉每帧 `setState`**，改用 `ValueNotifier` 作 `CustomPaint(repaint:)` 驱动重绘 → 不再每帧重建 LayoutBuilder/Transform/CustomPaint 组件树（最大 CPU 降幅来源）；②`Transform.translate` 屏震改为画布内 `canvas.translate`（免组件重建）；③**复用 Paint**、出生闪光由 `RadialGradient` shader 改为三层同心圆（消除每帧建 shader）；④**ui.Image 泄漏修复**：换肤/退出时 `dispose()` 旧精灵；⑤精灵按 **96px 解码**（原 128px，屏显 ≤42px）省显存/内存；⑥**静止帧跳过重绘**（金币全落地且无特效时）；⑦**后台/息屏停表**（`WidgetsBindingObserver`），不再后台烧 CPU。**实测**（Redmi K30 5G，同一 `/proc/<pid>/stat` 采样法，v0.6.18 vs v0.6.19）：进程 CPU 由 **≈66%**（4 次采样 60.6~70.2%，抖动大）降至 **≈52%**（4 次采样 46.2~55.1%，更平稳），单核占用降幅约 **22%**；内存 **PSS 191MB → 157MB（约 −18%）**（Native Heap 25→20.5MB、Dalvik 9.7→7.2MB、Graphics 88→76MB）。44 测试 + analyze 通过。
 > 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
 >
@@ -124,7 +127,7 @@
 | 粒子硬上限 | `maxCoins = 300`（防越爆越卡），省电模式 150 + 30fps | 手册 §5.3/§5.4 |
 | 存储 | MVP 用 `shared_preferences`，历史记录再升 SQLite | PRD §7 / 手册 §4.3 |
 | 计时 | **免打卡**：上班/下班时间来自设置，金币按「今天的上班时间 → 现在」推算；不做后台保活 | PRD §4.2 |
-| 分发 | release 用 Flutter 测试签名（`signingConfigs.debug`），侧载自用；分包 `--split-per-abi`，arm64 仅 16.9MB | 手册 §7 |
+| 分发 | release 用 Flutter 测试签名（`signingConfigs.debug`），侧载自用；分包 `--split-per-abi`，arm64 仅 16.9MB；**v3.4 起双风味**：`--flavor prod`（正式，`com.example.gold_rain`）/ `--flavor demo`（演示，`com.example.gold_rain.demo`，数据隔离） | 手册 §7 |
 | 视觉 | 主色 `#FFD700` 土豪金 + 深色背景 `#121212`；金币必须是精灵图（4 帧旋转），不是色块 | PRD §5 |
 | 隐私 | 零权限起步，全本地，卸载即清零 | PRD §6 |
 

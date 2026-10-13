@@ -108,8 +108,17 @@ cd "E:\0_CodeProject\12_GoldRainApp\gold_rain"
 flutter run                 # 真机调试（热重载）
 flutter test                # 跑单元测试
 flutter analyze             # 静态检查
-flutter build apk --release # 打正式包（约 20 MB）
+# 打正式包（v3.4 起加了产品风味，必须带 --flavor prod，否则 Gradle 变体不明确）
+flutter build apk --flavor prod --release --split-per-abi --obfuscate --split-debug-info=build/symbols
+# 打演示/调试包（独立包名 com.example.gold_rain.demo，可与正式版并排安装、数据隔离）
+flutter build apk --flavor demo --release --split-per-abi --obfuscate --split-debug-info=build/symbols
 ```
+产物路径带风味名：`build/app/outputs/flutter-apk/app-arm64-v8a-prod-release.apk` / `app-arm64-v8a-demo-release.apk`。
+
+**⚠️ 首次安装「演示版」需手机一次确认**：MIUI 对**全新包名**的安装（纯净模式）会拦截，`adb install` 报 `INSTALL_FAILED_USER_RESTRICTED: Install canceled by user`（正式版因为是替换同包名，可静默直装）。二选一放行一次即可：
+1. 开发者选项 → 打开「**USB 安装**（通过 USB 安装应用）」，再重试；
+2. 或在手机上直接点开 APK 手动安装并允许一次。
+放行后同一个 demo 包后续 `adb install -r` 也能静默直装。
 
 **真机首次运行**：手机连点 7 次"版本号"开开发者模式 → 打开 USB 调试 → 数据线连电脑 → 手机弹窗点"允许" → `flutter devices` 确认能看到手机 → `flutter run`。
 
