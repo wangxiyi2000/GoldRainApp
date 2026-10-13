@@ -86,7 +86,7 @@ class CoinField extends StatefulWidget {
 }
 
 class CoinFieldState extends State<CoinField>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const maxCoins = 300; // 粒子硬上限：保命，防止越爆越卡
   static const _gravity = 900.0; // 重力加速度 px/s²
   static const _settleSpeed = 200.0; // 落地速度低于此值则堆积，不再弹跳
@@ -109,6 +109,9 @@ class CoinFieldState extends State<CoinField>
   final List<_FloatText> _floats = [];
   final Random _rng = Random();
   final List<ui.Image> _frames = [];
+  /// 重绘信号：用 Listenable 驱动 CustomPaint 重绘，替代每帧 `setState`——
+  /// 不再重建 LayoutBuilder/Transform/CustomPaint 组件树，显著降 CPU 与 GC 抖动。
+  final ValueNotifier<int> _repaint = ValueNotifier<int>(0);
 
   double _width = 0;
   double _height = 0;
@@ -141,9 +144,21 @@ class CoinFieldState extends State<CoinField>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _ticker = createTicker(_update)..start();
     _sound = SoundPlayer(enabled: widget.soundOn);
     _loadSprites();
+  }
+
+  /// 后台/息屏停表：不在前台就不烧 CPU（省电、更稳）
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _lastTick = null; // 重置 dt，避免回前台首帧超大被丢弃
+      if (!_ticker.isActive) _ticker.start();
+    } else {
+      if (_ticker.isActive) _ticker.stop();
+    }
   }
 
   @override
@@ -155,20 +170,43 @@ class CoinFieldState extends State<CoinField>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker.dispose();
+    for (final img in _frames) {
+      img.dispose(); // 释放原生图像内存（换肤/退出不再泄漏）
+    }
+    _frames.clear();
+    _repaint.dispose();
     super.dispose();
   }
 
   Future<void> _loadSprites() async {
-    _frames.clear();
+    final old = List<ui.Image>.of(_frames);
+    final loaded = <ui.Image>[];
     for (final path in widget.skin.framePaths) {
       try {
         final data = await rootBundle.load(path);
-        final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-        _frames.add((await codec.getNextFrame()).image);
+        // 精灵在屏幕上最大约 42px，按 96px 解码足够清晰，却省下约一半显存/内存
+        final codec = await ui.instantiateImageCodec(
+          data.buffer.asUint8List(),
+          targetWidth: 96,
+        );
+        loaded.add((await codec.getNextFrame()).image);
       } catch (_) {
         // 素材缺失时退回占位圆（不阻塞动画）
       }
+    }
+    if (!mounted) {
+      for (final img in loaded) {
+        img.dispose();
+      }
+      return;
+    }
+    _frames
+      ..clear()
+      ..addAll(loaded);
+    for (final img in old) {
+      img.dispose(); // 旧皮肤精灵立即释放
     }
   }
 
@@ -213,9 +251,9 @@ class CoinFieldState extends State<CoinField>
       widget.onHourlySurge?.call(now.hour);
     }
 
-    // ③ 按速率出生
+    // ③ 按速率出生（首帧还没拿到尺寸时不出币，避免堆在左上角）
     final rate = _effectiveSpawn;
-    if (rate > 0) {
+    if (rate > 0 && _width > 0) {
       _spawnAcc += rate * dt;
       while (_spawnAcc >= 1 && _coins.length < maxCoins) {
         // 爆发期达到在场金币上限（如彩蛋 liveCap=20）→ 暂停出生，防满屏卡顿
@@ -317,7 +355,18 @@ class CoinFieldState extends State<CoinField>
       _startCollect();
     }
 
-    setState(() {});
+    // 只有"画面真的在动"时才请求重绘：金币全落地且无特效时画面是静止的，省 CPU
+    if (_needsRepaint()) _repaint.value++;
+  }
+
+  /// 是否需要重绘：有运动中/闪光中的金币、火花、飘字、收仓或屏震
+  bool _needsRepaint() {
+    if (_collecting || _shakeTime > 0 || _surgeRemaining > 0) return true;
+    if (_sparks.isNotEmpty || _floats.isNotEmpty) return true;
+    for (final c in _coins) {
+      if (!c.landed || c.flash > 0) return true;
+    }
+    return false;
   }
 
   /// 触发收仓：钱袋出现在右下落地线，当前所有金币飞向钱袋（纯视觉，不动账本）
@@ -391,28 +440,18 @@ class CoinFieldState extends State<CoinField>
     HapticFeedback.lightImpact();
   }
 
+  /// 画师实例常驻（缓存 TextPainter、避免每秒重建与监听切换）
+  late final _CoinPainter _painter = _CoinPainter(this);
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         _width = constraints.maxWidth;
         _height = constraints.maxHeight;
+        // 组件树保持静止，重绘由 _repaint(Listenable) 驱动（不再每帧 setState）
         return RepaintBoundary(
-          child: Transform.translate(
-            offset: _shakeOffset,
-            child: CustomPaint(
-              painter: _CoinPainter(
-                coins: _coins,
-                sparks: _sparks,
-                floats: _floats,
-                frames: _frames,
-                themeColor: widget.skin.themeColor,
-                collectPos: _collecting ? _bagPos : null,
-                collectPulse: _collectClock,
-              ),
-              size: Size.infinite,
-            ),
-          ),
+          child: CustomPaint(painter: _painter, size: Size.infinite),
         );
       },
     );
@@ -430,23 +469,13 @@ class CoinFieldState extends State<CoinField>
 }
 
 class _CoinPainter extends CustomPainter {
-  _CoinPainter({
-    required this.coins,
-    required this.sparks,
-    required this.floats,
-    required this.frames,
-    required this.themeColor,
-    required this.collectPos,
-    required this.collectPulse,
-  });
+  _CoinPainter(this.field) : super(repaint: field._repaint);
 
-  final List<_Coin> coins;
-  final List<_Spark> sparks;
-  final List<_FloatText> floats;
-  final List<ui.Image> frames;
-  final Color themeColor; // 皮肤主题色（占位圆/火花/飘字/袋口）
-  final Offset? collectPos; // 收仓中：钱袋锚点（null = 未收仓）
-  final double collectPulse; // 收仓计时（驱动钱袋脉动）
+  final CoinFieldState field;
+
+  // 复用的 Paint：避免每帧每粒子 new Paint（大幅减少 GC 抖动）
+  final Paint _spritePaint = Paint()..filterQuality = FilterQuality.medium;
+  final Paint _fxPaint = Paint();
 
   // 性能缓存：飘字/钱袋"¥" TextPainter 复用到画面变化才重建
   TextPainter? _floatTp;
@@ -454,29 +483,37 @@ class _CoinPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..filterQuality = FilterQuality.medium;
+    // 屏震：整层位移（原来用 Transform 包组件，现在直接在画布平移，免组件重建）
+    final shake = field._shakeOffset;
+    final shaken = shake != Offset.zero;
+    if (shaken) {
+      canvas.save();
+      canvas.translate(shake.dx, shake.dy);
+    }
+
+    final themeColor = field.widget.skin.themeColor;
+    final coins = field._coins;
+    final frames = field._frames;
 
     for (final c in coins) {
-      // 出生闪光（白色径向光晕，一帧即逝）
+      // 出生闪光（柔光：三层同心圆替代 RadialGradient shader，省掉每帧建 shader）
       if (c.flash > 0) {
         final r = c.size * (1.6 - c.flash * 0.6);
-        canvas.drawCircle(
-          Offset(c.x, c.y),
-          r,
-          Paint()
-            ..shader = RadialGradient(
-              colors: [
-                Colors.white.withValues(alpha: 0.5 * c.flash),
-                Colors.white.withValues(alpha: 0),
-              ],
-            ).createShader(Rect.fromCircle(center: Offset(c.x, c.y), radius: r)),
-        );
+        final center = Offset(c.x, c.y);
+        _fxPaint.shader = null;
+        _fxPaint.color = Colors.white.withValues(alpha: 0.10 * c.flash);
+        canvas.drawCircle(center, r, _fxPaint);
+        _fxPaint.color = Colors.white.withValues(alpha: 0.16 * c.flash);
+        canvas.drawCircle(center, r * 0.6, _fxPaint);
+        _fxPaint.color = Colors.white.withValues(alpha: 0.22 * c.flash);
+        canvas.drawCircle(center, r * 0.3, _fxPaint);
       }
 
       if (frames.isEmpty) {
         // 素材没加载完时的占位画法
-        canvas.drawCircle(
-            Offset(c.x, c.y), c.size / 2, Paint()..color = themeColor);
+        _fxPaint.shader = null;
+        _fxPaint.color = themeColor;
+        canvas.drawCircle(Offset(c.x, c.y), c.size / 2, _fxPaint);
         continue;
       }
       final img = frames[c.frame.clamp(0, frames.length - 1)];
@@ -484,27 +521,25 @@ class _CoinPainter extends CustomPainter {
         img,
         Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
         Rect.fromCenter(center: Offset(c.x, c.y), width: c.size, height: c.size),
-        paint,
+        _spritePaint,
       );
     }
 
-    // 落地溅火花：主题色小圆点，随生命值缩小淡出
+    // 落地溅火花：主题色小圆点，随生命值缩小淡出（复用 Paint）
+    final sparks = field._sparks;
     if (sparks.isNotEmpty) {
+      _fxPaint.shader = null;
       for (final s in sparks) {
-        final r = 1.5 + s.life * 2;
-        canvas.drawCircle(
-          Offset(s.x, s.y),
-          r,
-          Paint()..color = themeColor.withValues(alpha: 0.75 * s.life),
-        );
+        _fxPaint.color = themeColor.withValues(alpha: 0.75 * s.life);
+        canvas.drawCircle(Offset(s.x, s.y), 1.5 + s.life * 2, _fxPaint);
       }
     }
 
     // 收仓钱袋：袋口金色 + 棕色袋身 + "¥"（脉动呼吸）
-    if (collectPos != null) {
-      final bx = collectPos!.dx;
-      final by = collectPos!.dy;
-      final p = 1 + 0.05 * sin(collectPulse * 30); // 脉动
+    if (field._collecting) {
+      final bx = field._bagPos.dx;
+      final by = field._bagPos.dy;
+      final p = 1 + 0.05 * sin(field._collectClock * 30); // 脉动
       final bag = Paint()..color = const Color(0xFF6B4A1F);
       final bagLine = Paint()
         ..style = PaintingStyle.stroke
@@ -542,6 +577,7 @@ class _CoinPainter extends CustomPainter {
     }
 
     // 飘字（"+1"/"已入仓"，缓存 TextPainter，只换 style 省创建）
+    final floats = field._floats;
     if (floats.isNotEmpty) {
       final tp = _floatTp ??= TextPainter(textDirection: TextDirection.ltr);
       for (final f in floats) {
@@ -558,6 +594,8 @@ class _CoinPainter extends CustomPainter {
         tp.paint(canvas, Offset(f.x - tp.width / 2, f.y - tp.height / 2));
       }
     }
+
+    if (shaken) canvas.restore();
   }
 
   @override
