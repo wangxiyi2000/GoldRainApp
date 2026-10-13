@@ -90,7 +90,7 @@ class CoinFieldState extends State<CoinField>
   static const maxCoins = 300; // 粒子硬上限：保命，防止越爆越卡
   static const _gravity = 900.0; // 重力加速度 px/s²
   static const _settleSpeed = 200.0; // 落地速度低于此值则堆积，不再弹跳
-  static const _surgeEvery = 60.0; // 每 60 秒一次金币瀑布
+  static const _surgeEvery = 10.0; // 每 10 秒一次金币瀑布（v0.6.8 由 60 秒下调）
   static const _surgeDuration = 3.0; // 瀑布持续 3 秒
   static const _surgeFactor = 20.0; // 瀑布期间速率 ×20
   static const _hourlyFactor = 40.0; // P1 整点大爆发：速率 ×40
@@ -198,7 +198,7 @@ class CoinFieldState extends State<CoinField>
       _surgeClock += dt;
       if (_surgeClock >= _surgeEvery) {
         _surgeClock = 0;
-        triggerSurge();
+        triggerSurge(liveCap: 10); // 普通金币雨在场金币封顶 10 颗
       }
     }
 
@@ -206,7 +206,10 @@ class CoinFieldState extends State<CoinField>
     final now = DateTime.now();
     if (now.minute == 0 && _lastHourSurge != now.hour) {
       _lastHourSurge = now.hour;
-      triggerSurge(factor: _hourlyFactor, duration: _hourlyDuration);
+      triggerSurge(
+          factor: _hourlyFactor,
+          duration: _hourlyDuration,
+          liveCap: 30); // 整点爆发在场金币封顶 30 颗
       widget.onHourlySurge?.call(now.hour);
     }
 
