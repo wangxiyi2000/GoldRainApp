@@ -49,16 +49,16 @@ const kRedpackSkin = CoinSkin(
   ],
 );
 
-const kPaycheckSkin = CoinSkin(
-  id: 'paycheck',
-  name: '工资条',
-  themeColor: Color(0xFF4CD964),
+const kYuanBaoSkin = CoinSkin(
+  id: 'yuanbao',
+  name: '元宝',
+  themeColor: kGold,
   unlockCoins: 2000,
   framePaths: [
-    'assets/skins/paycheck/0.png',
-    'assets/skins/paycheck/1.png',
-    'assets/skins/paycheck/2.png',
-    'assets/skins/paycheck/3.png',
+    'assets/skins/yuanbao/0.png',
+    'assets/skins/yuanbao/1.png',
+    'assets/skins/yuanbao/2.png',
+    'assets/skins/yuanbao/3.png',
   ],
 );
 
@@ -66,7 +66,7 @@ const kPaycheckSkin = CoinSkin(
 const kSkins = [
   kGoldSkin,
   kRedpackSkin,
-  kPaycheckSkin,
+  kYuanBaoSkin,
 ];
 
 /// 按 id 取皮肤，未知 id 回退默认金币

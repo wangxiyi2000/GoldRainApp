@@ -13,8 +13,8 @@ void main() {
   test('皮肤解锁门槛按金库总额判断', () {
     expect(kRedpackSkin.isUnlocked(99), isFalse);
     expect(kRedpackSkin.isUnlocked(100), isTrue);
-    expect(kPaycheckSkin.isUnlocked(1999), isFalse);
-    expect(kPaycheckSkin.isUnlocked(2000), isTrue);
+    expect(kYuanBaoSkin.isUnlocked(1999), isFalse);
+    expect(kYuanBaoSkin.isUnlocked(2000), isTrue);
   });
 
   test('未知皮肤 id 回退默认金币', () {
@@ -37,10 +37,10 @@ void main() {
   });
 
   test('新字段正常持久化往返', () {
-    const s = AppSettings(soundEnabled: false, skinId: 'paycheck');
+    const s = AppSettings(soundEnabled: false, skinId: 'yuanbao');
     final back = AppSettings.fromJson(
         Map<String, dynamic>.from(s.toJson().map((k, v) => MapEntry(k, v))));
     expect(back.soundEnabled, isFalse);
-    expect(back.skinId, 'paycheck');
+    expect(back.skinId, 'yuanbao');
   });
 }
