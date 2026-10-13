@@ -1,6 +1,9 @@
 # 《搬砖爆金币》项目现状与开发交接
 
-> 版本：v3.5 ｜ 日期：2026-10-13 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> 版本：v3.6 ｜ 日期：2026-10-13 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> **v3.6 变更**：**三端化（Android / iOS / HarmonyOS NEXT）第一步**——①**iOS 平台工程已就绪**：`flutter create --platforms=ios` 生成 `ios/`，`CFBundleDisplayName=搬砖爆金币`，并用 `assets/icon/app_icon.png` 生成全套 **15 张 iOS 图标**（含 1024 营销图、扁平化无 alpha），删除模板自带的 `test/widget_test.dart`。**本机无 Mac，iOS 只能在此备好工程与资源，出包/上架必须在 macOS + Xcode + 苹果开发者账号上做**。②**HarmonyOS NEXT 工具链勘察（重要结论）**：鸿蒙不跑安卓 APK，需 **OpenHarmony 版 Flutter** 出 HAP。正确源是 **GitCode `openharmony-sig/flutter_flutter`**（gitee 同名仓已归档），推荐分支 **`br_3.27.4-ohos-1.0.4`（Flutter 3.27.4，已内置 `flutter_tools/lib/src/ohos/*`）**；已克隆到 `E:\ohos\flutter327`。**踩坑**：gitee 的 `3.22.1-ohos-0.1.0` 分支**不含** ohos 工具链（clone 后 `flutter create --platforms ohos` 直接报 "ohos is not an allowed value"）。③**鸿蒙剩余门槛**：需 `DEVECO_SDK_HOME`（DevEco Studio，其官方下载页对本机 403/需华为账号）+ 签名（AppGallery Connect 证书/Profile，需实名华为账号）+ 真机或模拟器验证；另 `activeThumbColor` 在 3.27 不存在需换 `activeColor`，插件需换 OHOS 适配版（`shared_preferences`/`path_provider` 有，**`audioplayers` 无** → 鸿蒙端音效需降级）。
+> 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
+>
 > **v3.5 变更**：**v0.6.20 搬砖页大金额「数字恒定居中」**（`rain_page.dart` 的 `_BigAmount`）——原先金额区是「固定 280dp + 右对齐」，**在窄屏上整组（280 + 「元」）宽度超过可用宽度 → Row 溢出**，而 Flutter 的 `RenderFlex` 在溢出时 `remainingSpace` 被 `max(0,…)` 夹成 0，`mainAxisAlignment.center` 失效变成**左对齐溢出**（真机实测数字中心比屏心偏右约 26dp），再叠加「右对齐」→ 金额位数少时数字明显偏右。修复：①金额区改为 **`Expanded` 自适应占满中间**（不再固定 280dp，任何屏宽都不溢出）；②左侧加**与右侧「元」等宽的透明「元」占位** → 数字精确落在屏幕正中；③`FittedBox` 对齐 `centerRight` → `center`；右侧「元」固定在最右不随位数移动；超长金额照旧自动缩小。**新增回归测试 `test/rain_amount_center_test.dart`**（用真机尺寸 1080×2400@2.75 画布，校验 小/大/超长 三种金额数字中心 = 屏心 且无溢出异常）。**正式版与演示版（prod/demo）同步更新**，两个 APK 均已归档。47 测试 + analyze 通过。
 > 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
 >
