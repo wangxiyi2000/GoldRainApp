@@ -83,7 +83,8 @@ class _RainPageState extends State<RainPage> {
   void _celebrate(int level, {required bool missed}) {
     _eggLevel = level;
     widget.onEggAdvanced(level); // 持久化，防同档重复
-    _fieldKey.currentState?.triggerSurge(factor: 100, duration: 6);
+    _fieldKey.currentState?.triggerSurge(
+        factor: 100, duration: 6, liveCap: 20); // 彩蛋在场金币封顶 20 颗防卡顿
     _showToast(
         missed ? '你错过的彩蛋：已入账 ¥${level * _eggDiv}' : '今日破百！彩蛋 ×100');
   }

@@ -97,7 +97,7 @@ class CoinFieldState extends State<CoinField>
   static const _hourlyDuration = 4.0; // 持续 4 秒
   static const _shakeDuration = 0.5; // 爆屏屏震持续 0.5 秒
   static const _shakeAmp = 8.0; // 屏震最大振幅 px
-  static const _collectAt = 20; // 攒够 20 颗自动收仓（纯视觉，不动账本）
+  static const _collectAt = 10; // 攒够 10 颗自动收仓（纯视觉，不动账本；v0.6.7 由 20 下调）
   static const _collectMaxSec = 1.2; // 收仓动画最长时长（超时兜底清场）
   static const _collectCooldownSec = 1.5; // 收仓冷却：防"收完立刻又收"的抽搐感
 
@@ -116,6 +116,7 @@ class CoinFieldState extends State<CoinField>
   double _surgeRemaining = 0;
   double _surgeClock = 0;
   double _surgeFactorNow = _surgeFactor; // 当前瀑布倍率（可被整点/彩蛋覆盖）
+  int? _surgeLiveCap; // 爆发期间在场金币上限（null=不限，彩蛋用 20 防卡顿）
   double _hapticClock = 0;
   double _shakeTime = 0; // 屏震剩余时间（>0 则画面抖动）
   int _lastHourSurge = -1; // 已触发整点的"小时"，防同小时重复爆
@@ -172,9 +173,10 @@ class CoinFieldState extends State<CoinField>
   }
 
   /// 引爆一次大爆发（瀑布/整点/彩蛋共用）：指定倍率与时长
-  void triggerSurge({double factor = _surgeFactor, double duration = _surgeDuration}) {
+  void triggerSurge({double factor = _surgeFactor, double duration = _surgeDuration, int? liveCap}) {
     _surgeRemaining = duration;
     _surgeFactorNow = factor;
+    _surgeLiveCap = liveCap; // 传 liveCap 可限制爆发期间在场金币数（防满屏卡顿）
     _shakeTime = _shakeDuration; // 爆屏屏震
     _sound.whoosh(); // 爆发"唰"
   }
@@ -213,6 +215,11 @@ class CoinFieldState extends State<CoinField>
     if (rate > 0) {
       _spawnAcc += rate * dt;
       while (_spawnAcc >= 1 && _coins.length < maxCoins) {
+        // 爆发期达到在场金币上限（如彩蛋 liveCap=20）→ 暂停出生，防满屏卡顿
+        final cap = _surgeLiveCap;
+        if (_surgeRemaining > 0 && cap != null && _coins.length >= cap) {
+          break;
+        }
         _spawnAcc -= 1;
         // 爆发期间不飘字（太多会糊），平时每枚都飘 "+1"
         _spawn(x: _rng.nextDouble() * _width, showText: _surgeRemaining <= 0);
