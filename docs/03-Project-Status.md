@@ -1,6 +1,9 @@
 # 《搬砖爆金币》项目现状与开发交接
 
-> 版本：v3.4 ｜ 日期：2026-10-13 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> 版本：v3.5 ｜ 日期：2026-10-13 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> **v3.5 变更**：**v0.6.20 搬砖页大金额「数字恒定居中」**（`rain_page.dart` 的 `_BigAmount`）——原先金额区是「固定 280dp + 右对齐」，**在窄屏上整组（280 + 「元」）宽度超过可用宽度 → Row 溢出**，而 Flutter 的 `RenderFlex` 在溢出时 `remainingSpace` 被 `max(0,…)` 夹成 0，`mainAxisAlignment.center` 失效变成**左对齐溢出**（真机实测数字中心比屏心偏右约 26dp），再叠加「右对齐」→ 金额位数少时数字明显偏右。修复：①金额区改为 **`Expanded` 自适应占满中间**（不再固定 280dp，任何屏宽都不溢出）；②左侧加**与右侧「元」等宽的透明「元」占位** → 数字精确落在屏幕正中；③`FittedBox` 对齐 `centerRight` → `center`；右侧「元」固定在最右不随位数移动；超长金额照旧自动缩小。**新增回归测试 `test/rain_amount_center_test.dart`**（用真机尺寸 1080×2400@2.75 画布，校验 小/大/超长 三种金额数字中心 = 屏心 且无溢出异常）。**正式版与演示版（prod/demo）同步更新**，两个 APK 均已归档。47 测试 + analyze 通过。
+> 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
+>
 > **v3.4 变更**：**v0.6.19 增加「演示版」双风味构建**——`android/app/build.gradle.kts` 新增 `flavorDimensions "mode"` + 两个 productFlavor：**prod**（`com.example.gold_rain`，应用名「搬砖爆金币」＝正式版，数据/签名与历史版本完全一致）与 **demo**（`com.example.gold_rain.demo`，应用名「搬砖爆金币·演示」＝演示/调试版）。demo 是**独立 App**：包名不同 → 数据（SharedPreferences/战报/月薪等）与正式版**完全隔离**，可并排安装；除应用名外的功能与正式版**一模一样**。`AndroidManifest` 的 `android:label` 改为 `@string/app_name`（由风味 `resValue` 提供，需开 `buildFeatures.resValues = true`）。**构建命令变动**：正式版 `flutter build apk --flavor prod …`，演示版 `--flavor demo …`（产物名 `app-arm64-v8a-{prod,demo}-release.apk`）。已归档 `1_apk_files/搬砖爆金币-演示版-v0.6.19-arm64.apk`。⚠️ MIUI 对全新包名安装会拦截（纯净模式），演示版首次装需手机放行一次（见 `04-M0-Env-Setup.md` §7）。正式版产物 `com.example.gold_rain` 不受影响（已用 aapt 校验）。
 > 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
 >
