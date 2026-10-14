@@ -2,7 +2,7 @@
 // 不需要「下班打卡」——过了下班时间会自动收工、自动入库。
 // M2：叠上 CoinField 金币粒子动画（灵魂功能）。
 // P1：整点大爆发时弹「恭喜存活到 X 点」提示条；皮肤/音效设置透传给粒子场。
-// v0.5.0：今日收益每跨 ¥100 触发彩蛋——×100 大爆发 + 「今日破百」提示条。
+// v0.5.0：今日收益每跨 ¥100 触发彩蛋——×40 大爆发 + 「今日破百」提示条。
 // v0.6.0：彩蛋补放——错过跨百、下次打开 App 时补放一次彩蛋（「你错过的彩蛋」），
 //         档位持久化在 main 层（eggDate/eggLevel），这里只负责检测与引爆。
 import 'dart:async';
@@ -50,7 +50,7 @@ class _RainPageState extends State<RainPage> {
   Timer? _toastTimer;
   late int _eggLevel; // 今日已庆祝到的"百元档位"（彩蛋去重）
 
-  // 彩蛋：今日收益跨过整百的瞬间，引爆 ×100 大爆发（每档只触发一次）
+  // 彩蛋：今日收益跨过整百的瞬间，引爆 ×40 大爆发（每档只触发一次）
   int get _eggDiv => 100;
 
   @override
@@ -78,7 +78,7 @@ class _RainPageState extends State<RainPage> {
 
   /// 整点大爆发：弹「又到 X 点啦」
   void _onHourlySurge(int hour) {
-    _showToast('太棒了，又到 $hour 点！金币雨 ×40 🎉');
+    _showToast('太棒了，又到 $hour 点！金币雨 ×20 🎉');
   }
 
   /// 庆祝一次彩蛋（实时跨百 missed=false / 补放 missed=true），每档只庆祝一次
@@ -86,9 +86,9 @@ class _RainPageState extends State<RainPage> {
     _eggLevel = level;
     widget.onEggAdvanced(level); // 持久化，防同档重复
     _fieldKey.currentState?.triggerSurge(
-        factor: 100, duration: 6, liveCap: 20); // 彩蛋在场金币封顶 20 颗防卡顿
+        factor: 40, duration: 4, liveCap: 10); // 彩蛋在场金币封顶 10 颗防卡顿（v0.6.22 由 ×100/6s/20 下调）
     _showToast(
-        missed ? '你错过的彩蛋：已入账 ¥${level * _eggDiv}' : '今日破百！彩蛋 ×100');
+        missed ? '你错过的彩蛋：已入账 ¥${level * _eggDiv}' : '今日破百！彩蛋 ×40');
   }
 
   @override
