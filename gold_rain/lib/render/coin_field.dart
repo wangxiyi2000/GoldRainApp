@@ -12,10 +12,11 @@
 //   · v0.5.0 落地溅小金币：金币落地溅出 1~2 颗微尘火花（短命淡出）
 //   · v0.5.0 瀑布密集叮声：爆发期间叮声放宽限频到 40ms、音量稍大（噼里啪啦）
 //   · v0.5.0 彩蛋：公开 CoinFieldState.triggerSurge()，页面可随时引爆大爆发
-//   · 触觉反馈限频 5 次/秒；粒子硬上限 maxCoins = 300（防越爆越卡）
+//   · 触觉反馈限频 5 次/秒；粒子硬上限 maxCoins = 50（v0.6.13 由 300 下调，防卡顿）
 import 'dart:math';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -87,7 +88,7 @@ class CoinField extends StatefulWidget {
 
 class CoinFieldState extends State<CoinField>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  static const maxCoins = 300; // 粒子硬上限：保命，防止越爆越卡
+  static const maxCoins = 50; // 粒子硬上限：保命，防止越爆越卡（v0.6.13 由 300 下调）
   static const _gravity = 900.0; // 重力加速度 px/s²
   static const _settleSpeed = 200.0; // 落地速度低于此值则堆积，不再弹跳
   static const _surgeEvery = 10.0; // 每 10 秒一次金币瀑布（v0.6.8 由 60 秒下调）
@@ -97,7 +98,7 @@ class CoinFieldState extends State<CoinField>
   static const _hourlyDuration = 4.0; // 持续 4 秒
   static const _shakeDuration = 0.5; // 爆屏屏震持续 0.5 秒
   static const _shakeAmp = 8.0; // 屏震最大振幅 px
-  static const _collectAt = 10; // 攒够 10 颗自动收仓（纯视觉，不动账本；v0.6.7 由 20 下调）
+  static const _collectAt = 15; // 攒够 15 颗自动收仓（纯视觉，不动账本；v0.6.13 由 10 上调防卡顿）
   static const _collectMaxSec = 1.2; // 收仓动画最长时长（超时兜底清场）
   static const _collectCooldownSec = 1.5; // 收仓冷却：防"收完立刻又收"的抽搐感
 
@@ -402,12 +403,12 @@ class CoinFieldState extends State<CoinField>
         vy: sin(i / 8 * 2 * pi) * 130 - 60,
       ));
     }
-    HapticFeedback.lightImpact();
+    _haptic();
   }
 
   /// 落地溅出 1~2 颗微尘火花（主题色小圆点，短命）
   void _splash(_Coin c) {
-    if (_sparks.length >= 80) return; // 火花上限，防爆
+    if (_sparks.length >= 15) return; // 火花上限，防爆（v0.6.13 由 80 下调）
     final n = 1 + _rng.nextInt(2);
     for (var i = 0; i < n; i++) {
       _sparks.add(_Spark(
@@ -433,10 +434,17 @@ class CoinFieldState extends State<CoinField>
     _maybeHaptic();
   }
 
-  /// 触觉反馈（限频 5 次/秒，防手麻）
+  /// 触觉反馈（限频 5 次/秒，防手麻；Web 无振动硬件，直接跳过）
   void _maybeHaptic() {
+    if (kIsWeb) return;
     if (_hapticClock > 0) return;
     _hapticClock = 0.2;
+    _haptic();
+  }
+
+  /// 统一触觉入口（Web 端不调用平台通道）
+  void _haptic() {
+    if (kIsWeb) return;
     HapticFeedback.lightImpact();
   }
 

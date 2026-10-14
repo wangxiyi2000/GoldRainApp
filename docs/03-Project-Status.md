@@ -1,6 +1,9 @@
 # 《搬砖爆金币》项目现状与开发交接
 
-> 版本：v3.6 ｜ 日期：2026-10-13 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> 版本：v3.7 ｜ 日期：2026-10-14 ｜ 作用：给后续开发（人 + AI）一份"读完就能上手"的全局视图
+> **v3.7 变更**：**v0.6.21 金币数量参数调优（防卡顿）**——①收仓触发门槛 `_collectAt` 10 → **15 颗**（屏幕攒 15 颗才出现钱袋吸入动画）；②粒子硬上限 `maxCoins` 300 → **50 颗**（任何时刻在场金币 ≤50，超限移除最老，保命防卡顿）；③落地溅火花上限 80 → **15 颗**。测试断言同步更新（`coin_field_test.dart` 收仓用例 10→15）。47 测试 + analyze 通过。正式版已归档 `1_apk_files/搬砖爆金币-v0.6.21-arm64版-推荐.apk`。⚠️ **手机未连接（adb 无设备），真机验证待后续**。
+> 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
+>
 > **v3.6 变更**：**三端化（Android / iOS / HarmonyOS NEXT）第一步**——①**iOS 平台工程已就绪**：`flutter create --platforms=ios` 生成 `ios/`，`CFBundleDisplayName=搬砖爆金币`，并用 `assets/icon/app_icon.png` 生成全套 **15 张 iOS 图标**（含 1024 营销图、扁平化无 alpha），删除模板自带的 `test/widget_test.dart`。**本机无 Mac，iOS 只能在此备好工程与资源，出包/上架必须在 macOS + Xcode + 苹果开发者账号上做**。②**HarmonyOS NEXT 工具链勘察（重要结论）**：鸿蒙不跑安卓 APK，需 **OpenHarmony 版 Flutter** 出 HAP。正确源是 **GitCode `openharmony-sig/flutter_flutter`**（gitee 同名仓已归档），推荐分支 **`br_3.27.4-ohos-1.0.4`（Flutter 3.27.4，已内置 `flutter_tools/lib/src/ohos/*`）**；已克隆到 `E:\ohos\flutter327`。**踩坑**：gitee 的 `3.22.1-ohos-0.1.0` 分支**不含** ohos 工具链（clone 后 `flutter create --platforms ohos` 直接报 "ohos is not an allowed value"）。③**鸿蒙剩余门槛**：需 `DEVECO_SDK_HOME`（DevEco Studio，其官方下载页对本机 403/需华为账号）+ 签名（AppGallery Connect 证书/Profile，需实名华为账号）+ 真机或模拟器验证；另 `activeThumbColor` 在 3.27 不存在需换 `activeColor`，插件需换 OHOS 适配版（`shared_preferences`/`path_provider` 有，**`audioplayers` 无** → 鸿蒙端音效需降级）。
 > 配套：`01-PRD.md`（做什么）｜`02-Dev-Manual.md`（怎么做）
 >
