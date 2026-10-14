@@ -1,10 +1,10 @@
 // 搬砖中页面（PRD v1.3 + M2 + P1 + v0.5.0 + v0.6.0）：金币实时爆屏 + 金额 3 位小数连续跳动。
 // 不需要「下班打卡」——过了下班时间会自动收工、自动入库。
 // M2：叠上 CoinField 金币粒子动画（灵魂功能）。
-// P1：整点大爆发时弹「恭喜存活到 X 点」提示条；皮肤/音效设置透传给粒子场。
-// v0.5.0：今日收益每跨 ¥100 触发彩蛋——×40 大爆发 + 「今日破百」提示条。
+// P1：皮肤/音效设置透传给粒子场。
+// v0.5.0：今日收益每跨 ¥100 触发彩蛋——「今日破百」提示条（v0.6.23 起无爆发动画，仅提示+记录）。
 // v0.6.0：彩蛋补放——错过跨百、下次打开 App 时补放一次彩蛋（「你错过的彩蛋」），
-//         档位持久化在 main 层（eggDate/eggLevel），这里只负责检测与引爆。
+//         档位持久化在 main 层（eggDate/eggLevel），这里只负责检测与提示。
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -45,12 +45,11 @@ class RainPage extends StatefulWidget {
 }
 
 class _RainPageState extends State<RainPage> {
-  final GlobalKey<CoinFieldState> _fieldKey = GlobalKey<CoinFieldState>();
-  String? _toastText; // 提示条文案（整点 / 彩蛋共用，null = 不显示）
+  String? _toastText; // 提示条文案（彩蛋用，null = 不显示）
   Timer? _toastTimer;
   late int _eggLevel; // 今日已庆祝到的"百元档位"（彩蛋去重）
 
-  // 彩蛋：今日收益跨过整百的瞬间，引爆 ×40 大爆发（每档只触发一次）
+  // 彩蛋：今日收益跨过整百的瞬间弹提示（每档只触发一次，v0.6.23 起不再爆发）
   int get _eggDiv => 100;
 
   @override
@@ -76,19 +75,12 @@ class _RainPageState extends State<RainPage> {
     });
   }
 
-  /// 整点大爆发：弹「又到 X 点啦」
-  void _onHourlySurge(int hour) {
-    _showToast('太棒了，又到 $hour 点！金币雨 ×20 🎉');
-  }
-
   /// 庆祝一次彩蛋（实时跨百 missed=false / 补放 missed=true），每档只庆祝一次
   void _celebrate(int level, {required bool missed}) {
     _eggLevel = level;
     widget.onEggAdvanced(level); // 持久化，防同档重复
-    _fieldKey.currentState?.triggerSurge(
-        factor: 40, duration: 4, liveCap: 10); // 彩蛋在场金币封顶 10 颗防卡顿（v0.6.22 由 ×100/6s/20 下调）
     _showToast(
-        missed ? '你错过的彩蛋：已入账 ¥${level * _eggDiv}' : '今日破百！彩蛋 ×40');
+        missed ? '你错过的彩蛋：已入账 ¥${level * _eggDiv}' : '今日破百！彩蛋 🎉');
   }
 
   @override
@@ -116,14 +108,12 @@ class _RainPageState extends State<RainPage> {
 
     return Stack(
       children: [
-        // 金币粒子层（传「屏幕出币速率」= 账本速率 × 视觉倍率；皮肤/音效/整点回调一起透传）
+        // 金币粒子层（传「屏幕出币速率」= 账本速率 × 视觉倍率；皮肤/音效设置一起透传）
         Positioned.fill(
           child: CoinField(
-            key: _fieldKey,
             spawnPerSecond: engine.spawnPerSecond,
             skin: widget.settings.skin,
             soundOn: widget.settings.soundEnabled,
-            onHourlySurge: _onHourlySurge,
           ),
         ),
         // 信息层（半透明底，金币穿过也看得清）

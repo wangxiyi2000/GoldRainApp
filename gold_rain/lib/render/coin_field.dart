@@ -5,7 +5,7 @@
 //   · 重力下落 + 落地弹跳两次后停在落地线堆积（v0.6.1 起不画底部金堆渐变带）
 //   · 金币精灵 4 帧旋转（帧 0→1→2→3 循环 = 旋转一圈）
 //   · 出生瞬间白色径向闪光 + "+1" 飘字上浮淡出
-//   · 每 10 秒一次"金币瀑布"（速率 ×10，2 秒）；P1 整点再爆一次更猛的（×20，3 秒）
+//   · v0.6.23：瀑布/整点/彩蛋爆发已全部停用，仅保留正常掉金币 + 收仓（稳定丝滑优先）
 //   · P1 音效：金币落地"叮"（限频）+ 瀑布"唰"，有静音开关
 //   · P1 皮肤：精灵图与主题色由 CoinSkin 提供（金库余额解锁）
 //   · v0.5.0 爆屏屏震：任何爆发（瀑布/整点/彩蛋）的头 0.5s 屏幕随机抖动衰减
@@ -67,7 +67,6 @@ class CoinField extends StatefulWidget {
     required this.spawnPerSecond,
     this.skin = kGoldSkin,
     this.soundOn = true,
-    this.onHourlySurge,
   });
 
   /// 屏幕出币速率（枚/秒）= 账本速率 × 视觉倍率，由 CoinEngine 提供
@@ -79,9 +78,6 @@ class CoinField extends StatefulWidget {
   /// 音效开关（来自设置）
   final bool soundOn;
 
-  /// 整点大爆发回调（参数=当前小时），给页面弹"恭喜存活到 X 点"
-  final ValueChanged<int>? onHourlySurge;
-
   @override
   State<CoinField> createState() => CoinFieldState();
 }
@@ -91,11 +87,8 @@ class CoinFieldState extends State<CoinField>
   static const maxCoins = 50; // 粒子硬上限：保命，防止越爆越卡（v0.6.13 由 300 下调）
   static const _gravity = 900.0; // 重力加速度 px/s²
   static const _settleSpeed = 200.0; // 落地速度低于此值则堆积，不再弹跳
-  static const _surgeEvery = 10.0; // 每 10 秒一次金币瀑布（v0.6.8 由 60 秒下调）
-  static const _surgeDuration = 2.0; // 瀑布持续 2 秒（v0.6.22 由 3 秒下调）
-  static const _surgeFactor = 10.0; // 瀑布期间速率 ×10（v0.6.22 由 ×20 下调）
-  static const _hourlyFactor = 20.0; // P1 整点大爆发：速率 ×20（v0.6.22 由 ×40 下调）
-  static const _hourlyDuration = 3.0; // 持续 3 秒（v0.6.22 由 4 秒下调）
+  static const _surgeDuration = 2.0; // 爆发持续 2 秒（仅外部手动触发时生效）
+  static const _surgeFactor = 10.0; // 爆发期间速率 ×10（仅外部手动触发时生效）
   static const _shakeDuration = 0.5; // 爆屏屏震持续 0.5 秒
   static const _shakeAmp = 8.0; // 屏震最大振幅 px
   static const _collectAt = 15; // 攒够 15 颗自动收仓（纯视觉，不动账本；v0.6.13 由 10 上调防卡顿）
@@ -118,12 +111,10 @@ class CoinFieldState extends State<CoinField>
   double _height = 0;
   double _spawnAcc = 0;
   double _surgeRemaining = 0;
-  double _surgeClock = 0;
-  double _surgeFactorNow = _surgeFactor; // 当前瀑布倍率（可被整点/彩蛋覆盖）
-  int? _surgeLiveCap; // 爆发期间在场金币上限（null=不限，彩蛋用 20 防卡顿）
+  double _surgeFactorNow = _surgeFactor; // 当前爆发倍率
+  int? _surgeLiveCap; // 爆发期间在场金币上限（null=不限）
   double _hapticClock = 0;
   double _shakeTime = 0; // 屏震剩余时间（>0 则画面抖动）
-  int _lastHourSurge = -1; // 已触发整点的"小时"，防同小时重复爆
   double _collectClock = 0; // 收仓计时（>0 表示收仓进行中）
   int _collectTarget = 0; // 本次收仓参与的金币数（吸满或超时即完成）
   int _collectCount = 0; // 已吸入袋口的金币数
@@ -211,7 +202,7 @@ class CoinFieldState extends State<CoinField>
     }
   }
 
-  /// 引爆一次大爆发（瀑布/整点/彩蛋共用）：指定倍率与时长
+  /// 手动引爆一次大爆发（v0.6.23 起内部不再自动触发，仅供未来恢复/外部调用）
   void triggerSurge({double factor = _surgeFactor, double duration = _surgeDuration, int? liveCap}) {
     _surgeRemaining = duration;
     _surgeFactorNow = factor;
@@ -229,30 +220,13 @@ class CoinFieldState extends State<CoinField>
     _lastTick = elapsed;
     if (dt <= 0 || dt > 0.1) return;
 
-    // ① 金币瀑布计时（每 60 秒爆发一次）
+    // ① 爆发剩余计时（v0.6.23 起瀑布/整点/彩蛋爆发已全部停用，仅保留外部手动触发通道）
     if (_surgeRemaining > 0) {
       _surgeRemaining -= dt;
       if (_surgeRemaining <= 0) _surgeFactorNow = _surgeFactor;
-    } else {
-      _surgeClock += dt;
-      if (_surgeClock >= _surgeEvery) {
-        _surgeClock = 0;
-        triggerSurge(liveCap: 6); // 普通金币雨在场金币封顶 6 颗（v0.6.22 由 10 下调）
-      }
     }
 
-    // ② P1 整点大爆发：跨过整点那一刻爆一次更猛的（同小时只爆一次）
-    final now = DateTime.now();
-    if (now.minute == 0 && _lastHourSurge != now.hour) {
-      _lastHourSurge = now.hour;
-      triggerSurge(
-          factor: _hourlyFactor,
-          duration: _hourlyDuration,
-          liveCap: 15); // 整点爆发在场金币封顶 15 颗（v0.6.22 由 30 下调）
-      widget.onHourlySurge?.call(now.hour);
-    }
-
-    // ③ 按速率出生（首帧还没拿到尺寸时不出币，避免堆在左上角）
+    // ② 按速率出生（首帧还没拿到尺寸时不出币，避免堆在左上角）
     final rate = _effectiveSpawn;
     if (rate > 0 && _width > 0) {
       _spawnAcc += rate * dt;
